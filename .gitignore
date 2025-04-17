@@ -1,0 +1,20 @@
+/gemma-2b-it/
+
+# Python字节码文件
+__pycache__/
+*.pyc
+
+# 认证信息和凭证文件
+token.pickle
+credentials.json
+token.json
+.env
+token_sheets.pickle
+
+# 临时/测试文件
+ダミー案件20件.xlsx
+
+venv/
+gemma-2b-transformers/
+
+test/
