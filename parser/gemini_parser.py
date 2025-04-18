@@ -1,10 +1,13 @@
-# parser/gemma_parser.py
+# parser/gemini_parser.py
 import json
 from dotenv import load_dotenv
+import sys
 import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 import re
 from typing import Dict, Any
 import logging
+from gmail.fetch_emails import get_gmail_service, fetch_ses_emails
 
 # .env 読み込み
 load_dotenv()
@@ -15,7 +18,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class GemmaParser:
+class GeminiParser:
     def __init__(self, model_name: str = "gemini-1.5-flash-latest"):
         """
         Google Generative AI (Gemini) モデルの初期化
@@ -111,40 +114,16 @@ class GemmaParser:
         }
 
 if __name__ == "__main__":
-    parser = GemmaParser()
-    print("✅ gemma_parser.py 正常启动")
+    # Gmail APIからメールを取得
+    service = get_gmail_service()
+    emails = fetch_ses_emails(service)
     
-    
-    
-#     sample_text = """
-# 【案件タイトル】金融システム開発プロジェクト
+    parser = GeminiParser()
+    print("✅ gemma_parser.py 正常起動")
 
-# 【業務内容】
-# 銀行向け決済システムの設計・開発業務
-# - 要求分析・基本設計
-# - Javaによる詳細設計・実装
-# - 単体テスト・結合テストの実施
-
-# 【必須スキル】
-# - Java (Spring Boot) 3年以上
-# - SQL (Oracle, PostgreSQL)
-# - 基本設計書作成経験
-
-# 【尚可スキル】
-# - 金融領域知識
-# - Docker/Kubernetes
-# - マイクロサービスアーキテクチャ
-
-# 【勤務地】
-# 東京都千代田区（リモート可：週2回出社）
-
-# 【単価】
-# ¥750,000〜850,000/月
-
-# 【その他】
-# プロジェクト期間：2024年9月〜2025年3月
-# """
-    
-#     result = parser.parse_email(sample_text)
-#     print("解析結果:")
-#     print(json.dumps(result, indent=2, ensure_ascii=False))
+    # メールを解析して結果を表示
+    for i, email in enumerate(emails[:3], 1):  # 最初の3件のメールを解析
+        email_text = email['snippet']  # メールのスニペットを取得（メール本文を抜粋）
+        print(f"\n解析結果 {i}:")
+        result = parser.parse_email(email_text)
+        print(json.dumps(result, indent=2, ensure_ascii=False))

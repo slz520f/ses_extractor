@@ -41,7 +41,7 @@ def get_today_date_query():
 
     return f'after:{after_str} before:{before_str}'
 
-def fetch_ses_emails(service, query="(案件 OR SE OR エンジニア ) has:nouserlabels "):
+def fetch_ses_emails(service, query="(案件 OR SE   ) has:nouserlabels "):
     """当日受信したSES案件メール（添付ファイルなし）を取得"""
     date_query = get_today_date_query()
     full_query = f" {query}{date_query}"
