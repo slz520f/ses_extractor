@@ -6,10 +6,14 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 import re 
 from utils.price_simplifier import PriceSimplifier
 import mysql.connector
-
-
+import logging
+from gmail.fetch_emails import get_gmail_service, fetch_ses_emails
+from parser.gemini_parser import GeminiParser
 from dotenv import load_dotenv  # 导入 dotenv
-from utils.price_simplifier import PriceSimplifier
+from datetime import datetime
+import base64
+import json
+
 
 # .envファイルを読み込む
 load_dotenv()
@@ -27,6 +31,7 @@ def get_db_connection():
     
     try:
         # MySQLに接続
+        print("正在尝试连接到数据库...")
         conn = mysql.connector.connect(
             host=MYSQL_HOST,
             user=MYSQL_USER,
@@ -54,11 +59,17 @@ def insert_email_to_db(email_data):
         return
     
     try:
+        print(f"準備插入数据: {email_data}")
         # PriceSimplifierのインスタンス作成
         price_simplifier = PriceSimplifier()
 
+        unit_price_raw = email_data.get('unit_price', '')
+        if isinstance(unit_price_raw, list):
+            unit_price_raw = ', '.join(unit_price_raw)
+
+
         # 単価を簡略化
-        simplified_price = price_simplifier.simplify_price(email_data.get('unit_price', ''))
+        simplified_price = price_simplifier.simplify_price(unit_price_raw)
 
         # データ挿入用SQLクエリ
         insert_query = """
@@ -97,17 +108,114 @@ def insert_email_to_db(email_data):
             cursor.close()
             conn.close()
 
-# テスト用データ
-# email_data = {
-#     'received_at': '2025-04-16 12:34:56',
-#     'subject': '案件タイトル',
-#     'sender_email': 'example@example.com',
-#     'raw_body': 'メール本文...',
-#     'project_description': '案件詳細...',
-#     'required_skills': ['Java', 'SQL'],
-#     'optional_skills': ['Docker'],
-#     'location': '東京都',
-#     'unit_price': '¥500,000/月'
-# }
 
-# insert_email_to_db(email_data)
+def extract_headers(msg, name):
+    """从邮件头中提取特定字段"""
+    headers = msg.get('payload', {}).get('headers', [])
+    for h in headers:
+        if h.get('name', '').lower() == name.lower():
+            return h.get('value', '')
+    return ''
+
+def extract_body(msg) -> str:
+    """从Gmail消息中提取纯文本正文"""
+    payload = msg.get('payload', {})
+    
+    # 尝试从parts中提取
+    parts = payload.get('parts', [])
+    for part in parts:  
+        if part.get('mimeType') == 'text/plain':
+            data = part.get('body', {}).get('data', '')
+            if data:
+                return base64.urlsafe_b64decode(data).decode('utf-8')
+    
+    # 回退方案：直接解码body.data
+    if 'body' in payload and 'data' in payload['body']:
+        return base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8')
+    
+    return msg.get('snippet', '')
+
+def format_datetime(gmail_date):
+    """格式化日期"""
+    try:
+        return datetime.strptime(gmail_date, '%a, %d %b %Y %H:%M:%S %z').strftime('%Y-%m-%d %H:%M:%S')
+    except Exception as e:
+        logging.error(f"日期格式化失败: {str(e)}")
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def main():
+    logging.info("🔍 正在从Gmail获取邮件...")
+    
+    try:
+        # 第一步：获取 Gmail 服务对象并获取邮件
+        service = get_gmail_service()
+        emails = fetch_ses_emails(service)
+        
+        if not emails:
+            logging.warning("📭 未找到今日邮件")
+            return
+        
+        logging.info(f"\n📩 找到 {len(emails)} 封符合条件的邮件")
+        
+        parser = GeminiParser()
+        email_data_list = []  # 用于存储所有处理后的邮件数据
+
+        # 第二步：处理每封邮件
+        for i, email in enumerate(emails, 1):
+            logging.info(f"\n--- 处理邮件 {i}/{len(emails)} ---")
+            
+            # 提取元数据
+            subject = extract_headers(email, 'Subject')
+            sender = extract_headers(email, 'From')
+            date = format_datetime(extract_headers(email, 'Date'))
+            body_text = extract_body(email)
+
+            logging.info(f"主题: {subject}")
+            logging.info(f"发件人: {sender}")
+            logging.info(f"日期: {date}")
+            
+            if not body_text.strip():
+                logging.warning("⚠️ 正文为空，跳过")
+                continue
+            
+            # 解析内容
+            try:
+                parsed = parser.parse_email(body_text)
+                logging.info("解析结果:")
+                logging.info(json.dumps(parsed, indent=2, ensure_ascii=False))
+                
+                # 准备数据库数据
+                email_data = {
+                    'received_at': date,
+                    'subject': subject,
+                    'sender_email': sender,
+                    'project_description': parsed.get('案件内容', ''),  # リストをカンマ区切りの文字列に変換
+                    # 'required_skills': ', '.join(parsed.get('必須スキル', [])),  # リストをカンマ区切りの文字列に変換
+                    # 'optional_skills': ', '.join(parsed.get('尚可スキル', [])),  # リストをカンマ区切りの文字列に変換
+                    'required_skills': parsed.get('必須スキル', []),
+                    'optional_skills': parsed.get('尚可スキル', []),
+                    "location": parsed.get("勤務地", ""),
+                    "unit_price": parsed.get("単価", "") 
+                }
+                
+                # 存储处理后的数据，准备写入数据库
+                email_data_list.append(email_data)
+            
+            except Exception as e:
+                logging.error(f"❌ 处理邮件时失败: {str(e)}")
+        
+        # 第三步：将数据写入数据库
+        if email_data_list:
+            logging.info("📤 开始写入数据库...")
+            for email_data in email_data_list:
+                insert_email_to_db(email_data)
+            logging.info("✅ 所有数据已存入数据库")
+
+    except Exception as e:
+        logging.error(f"主程序执行时发生错误: {str(e)}")
+if __name__ == "__main__":        
+    main()
+        
+
+
+
+
