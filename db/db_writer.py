@@ -24,6 +24,7 @@ MYSQL_USER = os.getenv('MYSQL_USER')
 MYSQL_PASSWORD = os.getenv('MYSQL_PASSWORD')
 MYSQL_DATABASE = os.getenv('MYSQL_DATABASE')
 
+
 def get_db_connection():
     if not all([MYSQL_HOST, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE]):
         print("MySQLの設定が不足しています。確認してください。")
@@ -49,6 +50,12 @@ def get_db_connection():
     except Exception as e:
         print(f"設定読み込み失敗: {e}")
         return None, None
+
+def serialize_field(value):
+    """如果是列表就序列化为 JSON 字符串，否则直接返回"""
+    if isinstance(value, list):
+        return json.dumps(value, ensure_ascii=False)
+    return value    
 
 def insert_email_to_db(email_data):
     conn, cursor = get_db_connection()
@@ -76,8 +83,8 @@ def insert_email_to_db(email_data):
             INSERT INTO ses_projects (
                 received_at, subject, sender_email, 
                 project_description, required_skills, optional_skills, location,
-                unit_price
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                unit_price, message_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
         """
         
         # データの準備
@@ -85,11 +92,12 @@ def insert_email_to_db(email_data):
             email_data['received_at'],
             email_data['subject'],
             email_data['sender_email'],
-            email_data['project_description'],
-            ', '.join(email_data['required_skills']),
-            ', '.join(email_data['optional_skills']),
-            email_data['location'],
-            simplified_price  # 簡略化された単価
+            serialize_field(email_data.get('project_description', '')),
+            serialize_field(email_data.get('required_skills', '')),
+            serialize_field(email_data.get('optional_skills', '')),
+            serialize_field(email_data.get('location', '')),
+            simplified_price,
+            email_data['message_id']
         )
         
         # SQLクエリを実行
@@ -194,7 +202,8 @@ def main():
                     'required_skills': parsed.get('必須スキル', []),
                     'optional_skills': parsed.get('尚可スキル', []),
                     "location": parsed.get("勤務地", ""),
-                    "unit_price": parsed.get("単価", "") 
+                    "unit_price": parsed.get("単価", ""),
+                    'message_id': email.get('id') 
                 }
                 
                 # 存储处理后的数据，准备写入数据库

@@ -90,12 +90,28 @@ def export_to_sheet(spreadsheet_id, sheet_name="シート1"):
         df['received_at'] = df['received_at'].astype(str)
 
     export_columns = [
-        "received_at", "subject", "sender_email", "project_description",
-        "required_skills", "optional_skills", "location", "unit_price"
+        "message_id","received_at", "subject", "sender_email", "project_description",
+        "required_skills", "optional_skills", "location", "unit_price" 
     ]
     df_export = df[export_columns].fillna('')
 
-    data = [df_export.columns.tolist()] + df_export.values.tolist()
+    # 英語→日本語の列名マッピング
+    column_mapping = {
+        "message_id": "メッセージID",
+        "received_at": "受信日時",
+        "subject": "件名",
+        "sender_email": "送信者メール",
+        "project_description": "案件内容",
+        "required_skills": "必須スキル",
+        "optional_skills": "尚可スキル",
+        "location": "勤務地",
+        "unit_price": "単価"
+    }
+
+    # 列ヘッダーを日本語に変換してデータ整形
+    header = [column_mapping.get(col, col) for col in df_export.columns]
+    data = [header] + df_export.values.tolist()
+
     body = {'values': data}
 
     result = service.spreadsheets().values().update(

@@ -70,7 +70,7 @@ Setup Type: Custom を選択
 Products: MySQL Server 8.0.X と MySQL Workbench を追加
 Authentication Method: Use Legacy Authentication Method を選択
 パスワード設定画面：
-Root Password: rootpass123 （チームで統一）
+Root Password: 
 Windows Service: Configure MySQL Server as a Windows Service をチェック
 
 Mac:
@@ -88,7 +88,7 @@ mysql_secure_installation
 
 # パスワード設定
 mysql -u root -p
-ALTER USER 'root'@'localhost' IDENTIFIED BY 'rootpass123';
+ALTER USER 'root'@'localhost' IDENTIFIED BY '自分が設定したいパスワード';
 FLUSH PRIVILEGES;
 exit
 \```
@@ -107,10 +107,9 @@ exit
     pip install -r requirements.txt
 
     # 4. 設定ファイル準備
-    cp config_sample.ini config.ini
     \```
     （GCP/Gmail APIの認証情報を入力）
-        # 4.1 .envファイル準備
+        # 4.1 .envファイル準備（秘密情報用）
             # Gemini 2.0 Flash-Lite API
             API_KEY=**********
 
@@ -126,7 +125,8 @@ exit
 
             GOOGLE_API_KEY=**********
             GOOGLE_SHEET_CREDENTIAL=**********
-        # 4.2 Google API認証情報取得手順
+        # 4.2 config/ファイル準備
+            Google API認証情報取得手順
             
             Google Cloud Console設定
                 ⭕️[Google Cloud Console](https://console.cloud.google.com/) にログイン
@@ -139,18 +139,17 @@ exit
                 ⭕️以下を検索して有効化：
                     Gmail API
                     Google Sheets API
-                    Google Drive API
 
             OAuth同意画面設定
                 ⭕️「OAuth同意画面」→「外部」→「作成」
                     アプリ情報：
                         アプリ名：SES Management System
                         ユーザーサポートメール：自分のアドレス
-                ⭕️スコップ追加：.../auth/gmail.readonly, .../auth/spreadsheets
+                ⭕️データアクセス→コップ追加：.../auth/gmail.readonly, .../auth/spreadsheets
 
             認証情報作成
-                ⭕️「認証情報」→「認証情報を作成」→「OAuth クライアントID」
+                ⭕️「クライアント」→「OAuth クライアントID」
                 ⭕️アプリケーション種類：デスクトップアプリ
                 ⭕️名前：Desktop-client
-                ⭕️「作成」後、JSONをダウンロード → config/client_secret.json に保存    
-
+                ⭕️「作成」後、JSONをダウンロード → config/credentials.json に保存    
+    # 5.python main.py実行

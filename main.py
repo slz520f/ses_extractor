@@ -103,7 +103,8 @@ def main():
                     'required_skills': parsed.get('必須スキル', []),
                     'optional_skills': parsed.get('尚可スキル', []),
                     "location": parsed.get("勤務地", ""),
-                    "unit_price": parsed.get("単価", "") 
+                    "unit_price": parsed.get("単価", ""),
+                    'message_id': email.get('id')  
                 }
                 
                 # 存储处理后的数据，准备写入数据库
