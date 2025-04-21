@@ -8,5 +8,6 @@ CREATE TABLE ses_projects (
     optional_skills TEXT,
     location TEXT,
     unit_price VARCHAR(100),
-    
+    message_id VARCHAR(255) UNIQUE,  
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
