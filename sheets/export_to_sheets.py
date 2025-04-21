@@ -59,7 +59,7 @@ def get_db_data():
         return df
 
     except mysql.connector.Error as e:
-        print("读取数据库失败：", e)
+        print("データベースの読み取りに失敗しました：", e)
         return pd.DataFrame()
 
 # 単価の文字列を数値に変換する関数
@@ -80,7 +80,7 @@ def export_to_sheet(spreadsheet_id, sheet_name="シート1"):
     df = get_db_data()
 
     if df.empty:
-        print("数据库无数据，导出中止")
+        print("データベースにデータがありません。エクスポートを中止します。")
         return
 
     df['unit_price_numeric'] = df['unit_price'].apply(clean_unit_price)
@@ -121,7 +121,7 @@ def export_to_sheet(spreadsheet_id, sheet_name="シート1"):
         body=body
     ).execute()
 
-    print(f"✅ 导出完成，共导出 {len(df_export)} 行。")
+    print(f"✅ エクスポート完了、合計 {len(df_export)} 行をエクスポートしました。")
 
 # メイン処理
 if __name__ == "__main__":
