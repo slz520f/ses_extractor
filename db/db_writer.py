@@ -32,7 +32,7 @@ def get_db_connection():
     
     try:
         # MySQLに接続
-        print("正在尝试连接到数据库...")
+        print("データベースに接続中...")
         conn = mysql.connector.connect(
             host=MYSQL_HOST,
             user=MYSQL_USER,
@@ -52,7 +52,7 @@ def get_db_connection():
         return None, None
 
 def serialize_field(value):
-    """如果是列表就序列化为 JSON 字符串，否则直接返回"""
+    """リストの場合はJSON文字列に変換、それ以外はそのまま返す"""
     if isinstance(value, list):
         return json.dumps(value, ensure_ascii=False)
     return value    
@@ -66,7 +66,7 @@ def insert_email_to_db(email_data):
         return
     
     try:
-        print(f"準備插入数据: {email_data}")
+        print(f"データを挿入する準備: {email_data}")
         # PriceSimplifierのインスタンス作成
         price_simplifier = PriceSimplifier()
 
@@ -118,7 +118,7 @@ def insert_email_to_db(email_data):
 
 
 def extract_headers(msg, name):
-    """从邮件头中提取特定字段"""
+    """メールのヘッダーから特定のフィールドを抽出"""
     headers = msg.get('payload', {}).get('headers', [])
     for h in headers:
         if h.get('name', '').lower() == name.lower():
@@ -126,10 +126,10 @@ def extract_headers(msg, name):
     return ''
 
 def extract_body(msg) -> str:
-    """从Gmail消息中提取纯文本正文"""
+    """Gmailメッセージからプレーンテキスト本文を抽出"""
     payload = msg.get('payload', {})
     
-    # 尝试从parts中提取
+     # partsから抽出を試みる
     parts = payload.get('parts', [])
     for part in parts:  
         if part.get('mimeType') == 'text/plain':
@@ -137,61 +137,63 @@ def extract_body(msg) -> str:
             if data:
                 return base64.urlsafe_b64decode(data).decode('utf-8')
     
-    # 回退方案：直接解码body.data
+    # フォールバック: body.dataを直接デコード
     if 'body' in payload and 'data' in payload['body']:
         return base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8')
     
     return msg.get('snippet', '')
 
 def format_datetime(gmail_date):
-    """格式化日期"""
+    """日付をフォーマット"""
     try:
+        # JSTなどのタイムゾーン名を取り除く
+        gmail_date = re.sub(r'\s*\(.*\)$', '', gmail_date)
         return datetime.strptime(gmail_date, '%a, %d %b %Y %H:%M:%S %z').strftime('%Y-%m-%d %H:%M:%S')
     except Exception as e:
-        logging.error(f"日期格式化失败: {str(e)}")
+        logging.error(f"日付のフォーマットに失敗しました: {str(e)}")
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 def main():
-    logging.info("🔍 正在从Gmail获取邮件...")
+    logging.info("🔍 Gmailからメールを取得中...")
     
     try:
-        # 第一步：获取 Gmail 服务对象并获取邮件
+        # 第1ステップ: Gmailサービスオブジェクトを取得し、メールを取得
         service = get_gmail_service()
         emails = fetch_ses_emails(service)
         
         if not emails:
-            logging.warning("📭 未找到今日邮件")
+            logging.warning("📭 今日のメールは見つかりませんでした")
             return
         
-        logging.info(f"\n📩 找到 {len(emails)} 封符合条件的邮件")
+        logging.info(f"\n📩 {len(emails)} 件の該当するメールが見つかりました")
         
         parser = GeminiParser()
-        email_data_list = []  # 用于存储所有处理后的邮件数据
+        email_data_list = []  # すべての処理済みメールデータを格納
 
-        # 第二步：处理每封邮件
+          # 第2ステップ: 各メールを処理
         for i, email in enumerate(emails, 1):
-            logging.info(f"\n--- 处理邮件 {i}/{len(emails)} ---")
+            logging.info(f"\n--- メール {i}/{len(emails)} を処理中 ---")
             
-            # 提取元数据
+             # メタデータの抽出
             subject = extract_headers(email, 'Subject')
             sender = extract_headers(email, 'From')
             date = format_datetime(extract_headers(email, 'Date'))
             body_text = extract_body(email)
 
-            logging.info(f"主题: {subject}")
-            logging.info(f"发件人: {sender}")
-            logging.info(f"日期: {date}")
+            logging.info(f"件名: {subject}")
+            logging.info(f"送信者: {sender}")
+            logging.info(f"日付: {date}")
             
             if not body_text.strip():
-                logging.warning("⚠️ 正文为空，跳过")
+                logging.warning("⚠️ 本文が空です。スキップします")
                 continue
             
-            # 解析内容
+           # 内容を解析
             try:
                 parsed = parser.parse_email(body_text)
                 logging.info("解析结果:")
                 logging.info(json.dumps(parsed, indent=2, ensure_ascii=False))
                 
-                # 准备数据库数据
+                # データベースに格納するためのデータを準備
                 email_data = {
                     'received_at': date,
                     'subject': subject,
@@ -206,21 +208,21 @@ def main():
                     'message_id': email.get('id') 
                 }
                 
-                # 存储处理后的数据，准备写入数据库
+                # 処理済みデータを格納、データベースに保存する準備
                 email_data_list.append(email_data)
             
             except Exception as e:
-                logging.error(f"❌ 处理邮件时失败: {str(e)}")
+                logging.error(f"❌ メール処理中にエラーが発生しました: {str(e)}")
         
-        # 第三步：将数据写入数据库
+        # 第3ステップ: データをデータベースに書き込む
         if email_data_list:
-            logging.info("📤 开始写入数据库...")
+            logging.info("📤 データベースに書き込み中...")
             for email_data in email_data_list:
                 insert_email_to_db(email_data)
-            logging.info("✅ 所有数据已存入数据库")
+            logging.info("✅ すべてのデータがデータベースに保存されました")
 
     except Exception as e:
-        logging.error(f"主程序执行时发生错误: {str(e)}")
+        logging.error(f"メインプログラム実行中にエラーが発生しました: {str(e)}")
 if __name__ == "__main__":        
     main()
         
