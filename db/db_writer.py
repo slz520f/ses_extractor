@@ -37,7 +37,8 @@ def get_db_connection():
             host=MYSQL_HOST,
             user=MYSQL_USER,
             password=MYSQL_PASSWORD,
-            database=MYSQL_DATABASE
+            database=MYSQL_DATABASE,
+             # 追加: MySQL 8.0以降の認証プラグイン
         )
         
         # 接続成功時にカーソルを作成

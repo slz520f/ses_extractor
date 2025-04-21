@@ -18,3 +18,8 @@ venv/
 gemma-2b-transformers/
 
 test/
+.streamlit/
+.DS_Store
+build/
+dist/
+*.icns
