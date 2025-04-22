@@ -38,7 +38,7 @@ def get_db_connection():
             user=MYSQL_USER,
             password=MYSQL_PASSWORD,
             database=MYSQL_DATABASE,
-             # 追加: MySQL 8.0以降の認証プラグイン
+            auth_plugin='mysql_native_password' # 追加: MySQL 8.0以降の認証プラグイン
         )
         
         # 接続成功時にカーソルを作成
@@ -96,7 +96,7 @@ def insert_email_to_db(email_data):
             serialize_field(email_data.get('project_description', '')),
             serialize_field(email_data.get('required_skills', '')),
             serialize_field(email_data.get('optional_skills', '')),
-            serialize_field(email_data.get('location', '')),
+            serialize_field(email_data.get('location', '')) or None,
             simplified_price,
             email_data['message_id']
         )
