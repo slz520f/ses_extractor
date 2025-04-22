@@ -10,6 +10,11 @@ import pickle
 import os
 import re
 from dotenv import load_dotenv
+import mysql.connector
+from mysql.connector import Error
+
+
+
 
 # 環境変数を読み込む
 load_dotenv()
@@ -58,7 +63,7 @@ def get_db_data():
         conn.close()
         return df
 
-    except mysql.connector.Error as e:
+    except Error as e:
         print("データベースの読み取りに失敗しました：", e)
         return pd.DataFrame()
 

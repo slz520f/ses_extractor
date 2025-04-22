@@ -11,6 +11,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
 
+from mysql.connector import Error
+
+
+
 # これらは4つのモジュールのインポート
 from gmail.fetch_emails import fetch_ses_emails
 from parser.gemini_parser import GeminiParser
@@ -121,10 +125,27 @@ with col1:
             st.error("⚠️ 先にログインしてください")
 
 with col2:
+    # st.markdown("### ② メール内容をGeminiで解析")
+    # if st.button('メール内容を抽出'):
+    #     if 'emails' not in st.session_state:
+    #         st.error("📭 メールを先に取得してください")
+    #     else:
+    #         emails = st.session_state['emails']
+    #         progress_bar = st.progress(0)
+    #         parser = GeminiParser()
+    #         email_data_list = []
+
+    #         for i, email in enumerate(emails, 1):
+    #             progress_bar.progress(i / len(emails))  # 更新进度条
+    #             parsed_data = parser.parse_email(email)  # 解析邮件
+    #             email_data_list.append(parsed_data)
+
+    #         st.session_state['email_data_list'] = email_data_list
+    #         st.success("🧠 Gemini解析が完了しました！")
     st.markdown("### ② メール内容をGeminiで解析")
     if st.button('メール内容を抽出'):
         if 'emails' not in st.session_state:
-            st.error("📭 メールを先に取得してください")
+            st.error("先に『提取邮件』を実行してください")
         else:
             emails = st.session_state['emails']
             progress_bar = st.progress(0)
@@ -132,12 +153,51 @@ with col2:
             email_data_list = []
 
             for i, email in enumerate(emails, 1):
-                progress_bar.progress(i / len(emails))  # 更新进度条
-                parsed_data = parser.parse(email)  # 解析邮件
-                email_data_list.append(parsed_data)
+                    logging.info(f"\n--- メール {i}/{len(emails)} を処理中 ---")
+                    progress_bar.progress(i / len(emails)) 
+                    
+                    # メタデータを抽出
+                    subject = extract_headers(email, 'Subject')
+                    sender = extract_headers(email, 'From')
+                    date = format_datetime(extract_headers(email, 'Date'))
+                    body_text = extract_body(email)
 
+                    logging.info(f"件名: {subject}")
+                    logging.info(f"送信者: {sender}")
+                    logging.info(f"日付: {date}")
+                    
+                    if not body_text.strip():
+                        logging.warning("⚠️ 本文が空です。スキップします。")
+                        continue
+                    
+                    # 内容を解析
+                    try:
+                        parsed = parser.parse_email(body_text)
+                        logging.info("解析結果:")
+                        logging.info(json.dumps(parsed, indent=2, ensure_ascii=False))
+                        
+                        # データベース用のデータを準備
+                        email_data = {
+                            'received_at': date,
+                            'subject': subject,
+                            'sender_email': sender,
+                            'project_description': parsed.get('案件内容', ''),  # リストをカンマ区切りの文字列に変換
+                            # 'required_skills': ', '.join(parsed.get('必須スキル', [])),  # リストをカンマ区切りの文字列に変換
+                            # 'optional_skills': ', '.join(parsed.get('尚可スキル', [])),  # リストをカンマ区切りの文字列に変換
+                            'required_skills': parsed.get('必須スキル', []),
+                            'optional_skills': parsed.get('尚可スキル', []),
+                            "location": parsed.get("勤務地", ""),
+                            "unit_price": parsed.get("単価", ""),
+                            'message_id': email.get('id')  
+                        }
+                        
+                        # 処理したデータを格納し、データベースに書き込む準備
+                        email_data_list.append(email_data)
+                    
+                    except Exception as e:
+                        logging.error(f"❌ メールの処理中にエラーが発生しました: {str(e)}")
             st.session_state['email_data_list'] = email_data_list
-            st.success("🧠 Gemini解析が完了しました！")
+            st.success("メールのフィルタリングが完了しました！")
 
 st.divider()
 
@@ -148,6 +208,7 @@ if st.button('データベースに書き込む'):
         st.error("🔍 先にメール内容を抽出してください")
     else:
         email_data_list = st.session_state['email_data_list']
+        logging.info("📤 データベースに書き込みを開始します...")
         for email_data in email_data_list:
             insert_email_to_db(email_data)
         st.success("✅ データベースへの保存が完了しました！")
