@@ -27,7 +27,7 @@ jobs:
         run: pyinstaller --onefile main.py  # 使用 PyInstaller 打包你的 Python 项目
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: executable
           path: dist/main.exe  # 上传生成的 .exe 文件
