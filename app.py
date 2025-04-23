@@ -101,6 +101,7 @@
 
 
 import streamlit as st
+import pandas as pd
 from test_web.auth_utils_produ import  get_gmail_service, get_sheets_service
 from test_web.gmail_utils import fetch_ses_emails
 from test_web.sheets_utils_produ import export_to_sheet
@@ -365,7 +366,7 @@ if 'credentials' in st.session_state:
     with col2:
         sheet_name = st.text_input(
             'シート名',
-            value="SES案件データ",
+            value="シート1",
             help="既存のシート名を指定するか、新規シート名を入力してください"
         )
     
