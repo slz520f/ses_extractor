@@ -275,7 +275,9 @@ else:
     # 单一登录按钮
     if st.button("Googleでログイン", key="google_login", help="Googleアカウントで認証します"):
         st.session_state['auth_url'] = auth_url
-        st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+        # st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+        st.write(f"[👉 Googleでログイン]({auth_url})", unsafe_allow_html=True)
+
 
 # 功能部分 (仅认证用户可见)
 if 'credentials' in st.session_state:
