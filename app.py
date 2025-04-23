@@ -312,9 +312,16 @@ if 'credentials' in st.session_state:
                 with st.spinner('メールを解析中...'):
                     try:
                         progress_bar = st.progress(0)
+                        progress_text = st.empty()  # 新增：用于显示百分比
+
+                        def progress_callback(p):
+                            percent = int(p * 100)
+                            progress_bar.progress(p)
+                            progress_text.markdown(f"**進捗：{percent}%**")
+
                         email_data_list = parse_emails_with_gemini(
                             st.session_state['emails'], 
-                            progress_callback=progress_bar.progress
+                            progress_callback=progress_callback
                         )
                         st.session_state['email_data_list'] = email_data_list
                         st.success(f"🧠 メール解析完了！ {len(email_data_list)}件のデータを生成しました")
