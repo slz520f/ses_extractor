@@ -9,7 +9,28 @@ import re
 
 import google.generativeai as genai
 import streamlit as st
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# 安全获取密钥（带错误提示）
+def get_gemini_key():
+    # 尝试从多途径获取
+    key = (
+        st.secrets.get("GOOGLE_API_KEY") or  # 1. Streamlit Secrets
+        os.getenv("GOOGLE_API_KEY") or       # 2. 系统环境变量
+        None
+    )
+    
+    if not key:
+        st.error("""
+        ❌ Gemini API密钥未配置！请：
+        1. 在Streamlit Cloud的Secrets中添加GOOGLE_API_KEY
+        2. 或设置环境变量GOOGLE_API_KEY
+        """)
+        st.stop()  # 阻止应用继续运行
+    return key
+try:
+    genai.configure(api_key=get_gemini_key())
+except Exception as e:
+    st.error(f"Gemini初始化失败: {str(e)}")
+    st.stop()
 # ログ設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
