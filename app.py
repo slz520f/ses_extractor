@@ -104,7 +104,7 @@ import streamlit as st
 from test_web.auth_utils_produ import get_google_credentials, get_gmail_service, get_sheets_service
 from test_web.gmail_utils import fetch_ses_emails
 from test_web.sheets_utils import export_to_sheet
-from test_web.gemini_utils import parse_emails_with_gemini
+from test_web.gemini_utils_produ import parse_emails_with_gemini
 import os
 import secrets
 from google_auth_oauthlib.flow import Flow
@@ -181,7 +181,7 @@ def get_oauth_flow():
                     "https://www.googleapis.com/auth/gmail.readonly",
                     "https://www.googleapis.com/auth/spreadsheets"
                 ],
-                redirect_uri=st.secrets.get("REDIRECT_URI", "https://yfegbszpl4efgzzfabdnqz.streamlit.app/")
+                redirect_uri=st.secrets.get("REDIRECT_URI", "https://sesextractor8501.streamlit.app/")
             )
         
         # 本地开发使用文件
@@ -193,7 +193,7 @@ def get_oauth_flow():
                     "https://www.googleapis.com/auth/gmail.readonly",
                     "https://www.googleapis.com/auth/spreadsheets"
                 ],
-                redirect_uri='http://localhost:8501/'
+                redirect_uri="http://localhost:8501/"
             )
         
         st.error("OAuth配置未找到。请在本地创建config/client_secrets.json或在Streamlit Cloud配置secrets")
