@@ -164,5 +164,8 @@ def parse_emails_with_gemini(emails: List[dict], progress_callback=None) -> List
 
 def get_gemini_model():
     api_key = st.secrets.get("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError("❌ GOOGLE_API_KEY が st.secrets に設定されていません！")
+    
     configure(api_key=api_key)
     return GenerativeModel("gemini-1.5-flash-latest")
