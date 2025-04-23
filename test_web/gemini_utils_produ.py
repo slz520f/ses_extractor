@@ -9,7 +9,7 @@ import re
 import streamlit as st
 
 import google.generativeai as genai
-genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY"))
 # ログ設定
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
