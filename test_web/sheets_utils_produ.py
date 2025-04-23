@@ -39,6 +39,10 @@ def get_gspread_service():
             creds = pickle.load(token)
 
     if not creds or not creds.valid:
+
+
+
+
         flow = InstalledAppFlow.from_client_secrets_file('config/client_secrets.json', SCOPES)
         creds = flow.run_local_server(port=0)
         with open(token_path, 'wb') as token:
@@ -118,4 +122,7 @@ def export_to_sheet(email_data_list,spreadsheet_id, sheet_name="シート1"):
         print(f"✅ エクスポート完了、合計 {len(df_export)} 行をエクスポートしました。")
     except Exception as e:
         print(f"❌ スプレッドシートへのエクスポート中にエラーが発生しました: {str(e)}")
+
+
+
 
