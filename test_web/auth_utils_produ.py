@@ -255,7 +255,7 @@ def display_google_login():
         flow = Flow.from_client_secrets_file(
             'config/client_secrets.json',
             scopes=SCOPES,
-            redirect_uri=st.secrets.get('REDIRECT_URI', "https://sesextractor8501.streamlit.app/")
+            redirect_uri=st.secrets.get('REDIRECT_URI', "https://ew4cdpjavj2nyqgqwbme7y.streamlit.app/")
         )
         
         # 生成并保存state
