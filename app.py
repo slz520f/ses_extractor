@@ -181,7 +181,7 @@ def get_oauth_flow():
                     "https://www.googleapis.com/auth/gmail.readonly",
                     "https://www.googleapis.com/auth/spreadsheets"
                 ],
-                redirect_uri=st.secrets.get("REDIRECT_URI", "https://sesextractor8501.streamlit.app/")
+                redirect_uri=st.secrets.get("REDIRECT_URI", "https://ew4cdpjavj2nyqgqwbme7y.streamlit.app/")
             )
         
         # 本地开发使用文件
