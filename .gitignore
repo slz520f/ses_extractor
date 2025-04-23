@@ -23,3 +23,5 @@ test/
 build/
 .ツール/
 *.icns
+config/client_secrets.json
+.streamlit/secrets.toml
