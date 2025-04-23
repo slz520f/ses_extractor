@@ -1,97 +1,97 @@
-# import streamlit as st
-# from auth_utils import get_google_credentials, get_gmail_service, get_sheets_service
-# from gmail_utils import fetch_ses_emails
-# from sheets_utils import export_to_sheet
-# from gemini_utils import parse_emails_with_gemini
-# import os
+import streamlit as st
+from auth_utils import get_google_credentials, get_gmail_service, get_sheets_service
+from gmail_utils import fetch_ses_emails
+from sheets_utils import export_to_sheet
+from gemini_utils import parse_emails_with_gemini
+import os
 
 
 
-# # 自动检查是否有 code（用户从 Google OAuth 跳转回来）
-# def handle_oauth_callback():
-#     code = st.query_params.get('code', [None])[0]
-#     if code and 'credentials' not in st.session_state:
-#         creds = get_google_credentials()
-#         if creds:
-#             st.session_state['credentials'] = creds
-#             st.success("✅ 自動認証に成功しました！")
-#         else:
-#             st.error("❌ 自動認証に失敗しました。")
+# 自动检查是否有 code（用户从 Google OAuth 跳转回来）
+def handle_oauth_callback():
+    code = st.query_params.get('code', [None])[0]
+    if code and 'credentials' not in st.session_state:
+        creds = get_google_credentials()
+        if creds:
+            st.session_state['credentials'] = creds
+            st.success("✅ 自動認証に成功しました！")
+        else:
+            st.error("❌ 自動認証に失敗しました。")
 
-# handle_oauth_callback()
-
-
+handle_oauth_callback()
 
 
 
 
-# # Streamlit 页面配置
-# st.set_page_config(page_title="SES案件管理システム", layout="wide")
-# st.title('📩 SES案件管理システム')
-# st.markdown("これは **Gmail + Gemini + Google Sheets** を組み合わせたSES案件抽出ツールです。")
 
-# st.divider()
 
-# # 🔐 Google认证
-# st.subheader("🔐 Google アカウント認証")
+# Streamlit 页面配置
+st.set_page_config(page_title="SES案件管理システム", layout="wide")
+st.title('📩 SES案件管理システム')
+st.markdown("これは **Gmail + Gemini + Google Sheets** を組み合わせたSES案件抽出ツールです。")
 
-# if not st.session_state.get('credentials'):
-#     if st.button('Googleでログイン'):
-#         st.write("ログインボタンがクリックされました。認証を開始します...")  # Debug log
-#         creds = get_google_credentials()
-#         if creds:
-#             st.session_state['credentials'] = creds
-#             st.success("✅ ログイン成功しました！")
-#         else:
-#             st.error("⚠️ ログインに失敗しました。再度お試しください。")    
-# else:
-#     st.success("✅ すでにログイン済みです。")
+st.divider()
 
-# st.divider()
+# 🔐 Google认证
+st.subheader("🔐 Google アカウント認証")
 
-# # 📥 获取邮件与解析
-# st.header("📥 メール取得・解析")
-# col1, col2 = st.columns(2)
+if not st.session_state.get('credentials'):
+    if st.button('Googleでログイン'):
+        st.write("ログインボタンがクリックされました。認証を開始します...")  # Debug log
+        creds = get_google_credentials()
+        if creds:
+            st.session_state['credentials'] = creds
+            st.success("✅ ログイン成功しました！")
+        else:
+            st.error("⚠️ ログインに失敗しました。再度お試しください。")    
+else:
+    st.success("✅ すでにログイン済みです。")
 
-# with col1:
-#     st.markdown("### ① GmailからSESメールを取得")
-#     if st.button('📨 メールを取得'):
-#         if st.session_state.get('credentials'):
-#             service = get_gmail_service()
-#             progress_bar = st.progress(0)
-#             emails = fetch_ses_emails(service, progress_bar)
-#             st.session_state['emails'] = emails
-#             st.success(f"📥 メール取得完了：{len(emails)}件")
-#         else:
-#             st.error("⚠️ 先にGoogleログインしてください")
+st.divider()
 
-# with col2:
-#     st.markdown("### ② メール内容をGeminiで解析")
-#     if st.button('🤖 Geminiで解析'):
-#         emails = st.session_state.get('emails')
-#         if not emails:
-#             st.error("⚠️ 先に『メールを取得』を実行してください")
-#         else:
-#             progress_bar = st.progress(0)
-#             email_data_list = parse_emails_with_gemini(emails, progress_callback=progress_bar.progress)
-#             st.session_state['email_data_list'] = email_data_list
-#             st.success("🧠 メール解析完了！")
+# 📥 获取邮件与解析
+st.header("📥 メール取得・解析")
+col1, col2 = st.columns(2)
 
-# st.divider()
+with col1:
+    st.markdown("### ① GmailからSESメールを取得")
+    if st.button('📨 メールを取得'):
+        if st.session_state.get('credentials'):
+            service = get_gmail_service()
+            progress_bar = st.progress(0)
+            emails = fetch_ses_emails(service, progress_bar)
+            st.session_state['emails'] = emails
+            st.success(f"📥 メール取得完了：{len(emails)}件")
+        else:
+            st.error("⚠️ 先にGoogleログインしてください")
 
-# # 📤 导出到Google Sheets
-# st.header("📤 Google Sheetsへのエクスポート")
-# spreadsheet_id = st.text_input('📝 Google SheetsのスプレッドシートIDを入力してください')
+with col2:
+    st.markdown("### ② メール内容をGeminiで解析")
+    if st.button('🤖 Geminiで解析'):
+        emails = st.session_state.get('emails')
+        if not emails:
+            st.error("⚠️ 先に『メールを取得』を実行してください")
+        else:
+            progress_bar = st.progress(0)
+            email_data_list = parse_emails_with_gemini(emails, progress_callback=progress_bar.progress)
+            st.session_state['email_data_list'] = email_data_list
+            st.success("🧠 メール解析完了！")
 
-# if st.button('📤 書き込む'):
-#     data = st.session_state.get('email_data_list', [])
-#     if not spreadsheet_id:
-#         st.error("🆔 スプレッドシートIDを入力してください")
-#     elif not data:
-#         st.error("⚠️ データがありません。先にメール解析を実行してください")
-#     else:
-#         export_to_sheet(email_data_list=data, spreadsheet_id=spreadsheet_id, sheet_name="シート1")
-#         st.success("✅ Google Sheetsへの書き込みが完了しました！")
+st.divider()
+
+# 📤 导出到Google Sheets
+st.header("📤 Google Sheetsへのエクスポート")
+spreadsheet_id = st.text_input('📝 Google SheetsのスプレッドシートIDを入力してください')
+
+if st.button('📤 書き込む'):
+    data = st.session_state.get('email_data_list', [])
+    if not spreadsheet_id:
+        st.error("🆔 スプレッドシートIDを入力してください")
+    elif not data:
+        st.error("⚠️ データがありません。先にメール解析を実行してください")
+    else:
+        export_to_sheet(email_data_list=data, spreadsheet_id=spreadsheet_id, sheet_name="シート1")
+        st.success("✅ Google Sheetsへの書き込みが完了しました！")
 
 
 
@@ -100,10 +100,10 @@
 
 
 import streamlit as st
-from test_web.auth_utils import get_google_credentials, get_gmail_service, get_sheets_service
-from test_web.gmail_utils import fetch_ses_emails
-from test_web.sheets_utils import export_to_sheet
-from test_web.gemini_utils import parse_emails_with_gemini
+from auth_utils import get_google_credentials, get_gmail_service, get_sheets_service
+from gmail_utils import fetch_ses_emails
+from sheets_utils import export_to_sheet
+from gemini_utils import parse_emails_with_gemini
 import os
 import secrets
 from google_auth_oauthlib.flow import Flow
@@ -165,19 +165,7 @@ st.markdown("""
 def handle_authentication():
     # 检查现有凭证
     if 'credentials' in st.session_state:
-        try:
-            # 验证凭证是否有效
-            if not st.session_state['credentials'].valid:
-                if st.session_state['credentials'].expired and st.session_state['credentials'].refresh_token:
-                    st.session_state['credentials'].refresh(Request())
-                else:
-                    del st.session_state['credentials']
-                    return False
-            return True
-        except Exception as e:
-            st.error(f"認証エラー: {str(e)}")
-            del st.session_state['credentials']
-            return False
+        return True
     
     # 尝试从URL参数获取code进行自动认证
     code = st.query_params.get('code')
@@ -193,10 +181,10 @@ def handle_authentication():
             )
             flow.fetch_token(code=code)
             st.session_state['credentials'] = flow.credentials
-            st.rerun()  # 清除URL中的code参数
+            st.experimental_rerun()  # 清除URL中的code参数
             return True
         except Exception as e:
-            return False
+            st.error(f"自動認証エラー: {str(e)}")
     
     return False
 
@@ -212,7 +200,7 @@ if handle_authentication():
     
     if st.button("🔓 ログアウト", key="logout_btn"):
         del st.session_state['credentials']
-        st.rerun()
+        st.experimental_rerun()
 else:
     st.markdown("""
     <div style="margin-bottom:20px;">
@@ -259,13 +247,10 @@ if 'credentials' in st.session_state:
             with st.spinner('メールを取得中...'):
                 try:
                     service = get_gmail_service()
-                    if service is None:
-                        st.error("Gmailサービスに接続できませんでした。認証を確認してください。")
-                    else:
-                        progress_bar = st.progress(0)
-                        emails = fetch_ses_emails(service, progress_bar)
-                        st.session_state['emails'] = emails
-                        st.success(f"📥 メール取得完了：{len(emails)}件")
+                    progress_bar = st.progress(0)
+                    emails = fetch_ses_emails(service, progress_bar)
+                    st.session_state['emails'] = emails
+                    st.success(f"📥 メール取得完了：{len(emails)}件")
                 except Exception as e:
                     st.error(f"エラーが発生しました: {str(e)}")
     
@@ -316,15 +301,11 @@ if 'credentials' in st.session_state:
         else:
             with st.spinner('Google Sheetsに書き込み中...'):
                 try:
-                    service = get_sheets_service()
-                    if service is None:
-                        st.error("Google Sheetsサービスに接続できませんでした。認証を確認してください。")
-                    else:
-                        export_to_sheet(
-                            email_data_list=st.session_state['email_data_list'],
-                            spreadsheet_id=spreadsheet_id,
-                            sheet_name=sheet_name
-                        )
-                        st.success("✅ Google Sheetsへの書き込みが完了しました！")
+                    export_to_sheet(
+                        email_data_list=st.session_state['email_data_list'],
+                        spreadsheet_id=spreadsheet_id,
+                        sheet_name=sheet_name
+                    )
+                    st.success("✅ Google Sheetsへの書き込みが完了しました！")
                 except Exception as e:
                     st.error(f"書き込み中にエラーが発生しました: {str(e)}")
