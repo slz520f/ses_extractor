@@ -331,10 +331,27 @@ if 'credentials' in st.session_state:
                     except Exception as e:
                         st.error(f"解析中にエラーが発生しました: {str(e)}")
     
-    # 数据显示
+    # # 数据显示
+    # if 'email_data_list' in st.session_state:
+    #     st.subheader("📊 解析結果プレビュー")
+    #     st.dataframe(st.session_state['email_data_list'], use_container_width=True)
+
     if 'email_data_list' in st.session_state:
         st.subheader("📊 解析結果プレビュー")
-        st.dataframe(st.session_state['email_data_list'], use_container_width=True)
+        
+        email_df = pd.DataFrame(st.session_state['email_data_list'])
+        email_df = email_df.convert_dtypes()
+        email_df = email_df.fillna('')  # 或者 .astype(str)
+
+        # 将列表或字典转成字符串，避免 pyarrow 报错
+        for col in email_df.columns:
+            email_df[col] = email_df[col].apply(
+                lambda x: ', '.join(map(str, x)) if isinstance(x, list)
+                else str(x) if isinstance(x, dict)
+                else x
+            )
+
+    st.dataframe(email_df, use_container_width=True)
     
     # 导出到Google Sheets
     st.header("📤 データエクスポート", divider="rainbow")
