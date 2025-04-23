@@ -100,7 +100,7 @@
 
 
 import streamlit as st
-from test_web.auth_utils import get_google_credentials, get_gmail_service, get_sheets_service
+from test_web.auth_utils_produ import get_google_credentials, get_gmail_service, get_sheets_service
 from test_web.gmail_utils import fetch_ses_emails
 from test_web.sheets_utils import export_to_sheet
 from test_web.gemini_utils import parse_emails_with_gemini
