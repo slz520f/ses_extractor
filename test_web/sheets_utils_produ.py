@@ -3,6 +3,7 @@ import unicodedata
 import json
 import os
 import pickle
+import streamlit as st
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
@@ -32,19 +33,26 @@ def normalize_email_data(email_data_list):
     
 def get_gspread_service():
     creds = None
-    token_path = 'sheets/token_sheets.pickle'
+    token_path = '/tmp/token_sheets.pickle'
 
     if os.path.exists(token_path):
         with open(token_path, 'rb') as token:
             creds = pickle.load(token)
 
     if not creds or not creds.valid:
+        # 1. 从 st.secrets 读取 JSON
+        client_secrets_dict = json.loads(st.secrets["google_oauth"]["client_secrets"])
+        
+        # 2. 写入临时文件
+        secrets_file_path = '/tmp/client_secrets.json'
+        with open(secrets_file_path, 'w') as f:
+            json.dump(client_secrets_dict, f)
 
-
-
-
-        flow = InstalledAppFlow.from_client_secrets_file('/Users/mame/ses_extractor/config/client_secrets.json', SCOPES)
+        # 3. 用 OAuth Flow
+        flow = InstalledAppFlow.from_client_secrets_file(secrets_file_path, SCOPES)
         creds = flow.run_local_server(port=0)
+
+        # 4. 保存 tokeng
         with open(token_path, 'wb') as token:
             pickle.dump(creds, token)
 
