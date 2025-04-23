@@ -161,6 +161,47 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+
+
+
+
+
+def get_oauth_flow():
+    """获取OAuth流程对象，兼容本地和Streamlit Cloud环境"""
+    try:
+        # 生产环境使用secrets
+        if st.secrets.get("google_oauth"):
+            client_config = {
+                "web": st.secrets["google_oauth"]
+            }
+            return Flow.from_client_config(
+                client_config,
+                scopes=[
+                    "https://www.googleapis.com/auth/gmail.readonly",
+                    "https://www.googleapis.com/auth/spreadsheets"
+                ],
+                redirect_uri=st.secrets.get("REDIRECT_URI", "https://your-app-name.streamlit.app/")
+            )
+        
+        # 本地开发使用文件
+        client_secrets_path = os.path.join(os.path.dirname(__file__), 'config/client_secrets.json')
+        if os.path.exists(client_secrets_path):
+            return Flow.from_client_secrets_file(
+                client_secrets_path,
+                scopes=[
+                    "https://www.googleapis.com/auth/gmail.readonly",
+                    "https://www.googleapis.com/auth/spreadsheets"
+                ],
+                redirect_uri='http://localhost:8501/'
+            )
+        
+        st.error("OAuth配置未找到。请在本地创建config/client_secrets.json或在Streamlit Cloud配置secrets")
+        return None
+        
+    except Exception as e:
+        st.error(f"OAuth初始化失败: {str(e)}")
+        return None
+    
 # 认证状态检查与处理
 def handle_authentication():
     # 检查现有凭证
@@ -183,19 +224,16 @@ def handle_authentication():
     code = st.query_params.get('code')
     if code:
         try:
-            flow = Flow.from_client_secrets_file(
-                'config/client_secrets.json',
-                scopes=[
-                    "https://www.googleapis.com/auth/gmail.readonly",
-                    "https://www.googleapis.com/auth/spreadsheets"
-                ],
-                redirect_uri='http://localhost:8501/'
-            )
+            flow = get_oauth_flow()
+            if flow is None:
+                return False
+                
             flow.fetch_token(code=code)
             st.session_state['credentials'] = flow.credentials
-            st.rerun()  # 清除URL中的code参数
+            st.rerun()
             return True
         except Exception as e:
+            st.error(f"認証処理エラー: {str(e)}")
             return False
     
     return False
@@ -221,25 +259,18 @@ else:
     """, unsafe_allow_html=True)
     
     # 准备OAuth流程
-    flow = Flow.from_client_secrets_file(
-        'config/client_secrets.json',
-        scopes=[
-            "https://www.googleapis.com/auth/gmail.readonly",
-            "https://www.googleapis.com/auth/spreadsheets"
-        ],
-        redirect_uri='http://localhost:8501/'
-    )
-    
-    # 生成并保存state
-    oauth_state = secrets.token_urlsafe(16)
-    st.session_state['oauth_state'] = oauth_state
-    
-    auth_url, _ = flow.authorization_url(
-        prompt='consent',
-        state=oauth_state,
-        access_type='offline',
-        include_granted_scopes='true'
-    )
+    flow = get_oauth_flow()
+    if flow is not None:
+        # 生成并保存state
+        oauth_state = secrets.token_urlsafe(16)
+        st.session_state['oauth_state'] = oauth_state
+        
+        auth_url, _ = flow.authorization_url(
+            prompt='consent',
+            state=oauth_state,
+            access_type='offline',
+            include_granted_scopes='true'
+        )
     
     # 单一登录按钮
     if st.button("Googleでログイン", key="google_login", help="Googleアカウントで認証します"):
