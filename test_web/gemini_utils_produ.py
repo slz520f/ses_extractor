@@ -7,7 +7,7 @@ from .gmail_utils import extract_headers, extract_body, format_datetime
 import os
 import re
 import streamlit as st
-
+from google.generativeai import configure, GenerativeModel
 import google.generativeai as genai
 genai.configure(api_key=st.secrets.get("GOOGLE_API_KEY"))
 # ログ設定
@@ -159,3 +159,10 @@ def parse_emails_with_gemini(emails: List[dict], progress_callback=None) -> List
             logging.error(f"❌ メールの処理中にエラーが発生しました: {str(e)}")
 
     return email_data_list
+
+
+
+def get_gemini_model():
+    api_key = st.secrets.get("GOOGLE_API_KEY")
+    configure(api_key=api_key)
+    return GenerativeModel("gemini-1.5-flash-latest")

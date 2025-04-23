@@ -362,3 +362,20 @@ if 'credentials' in st.session_state:
                         st.success("✅ Google Sheetsへの書き込みが完了しました！")
                 except Exception as e:
                     st.error(f"書き込み中にエラーが発生しました: {str(e)}")
+
+
+# 追加：Gemini API テスト
+st.header("🧪 Gemini API 接続テスト", divider="rainbow")
+
+if st.button("🚀 Gemini API をテスト実行", key="test_gemini"):
+    try:
+        from test_web.gemini_utils_produ import get_gemini_model
+        model = get_gemini_model()
+        prompt = "これはテストです。Gemini APIが正常に動作しているか確認しています。"
+        response = model.generate_content(prompt)
+        st.success("✅ Gemini API 接続成功！")
+        st.markdown(f"**Geminiの応答内容：**\n\n> {response.text}")
+    except Exception as e:
+        st.error(f"❌ Gemini API テスト失敗: {str(e)}")
+
+
