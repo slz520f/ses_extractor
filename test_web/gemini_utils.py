@@ -89,17 +89,36 @@ class GeminiParser:
         Returns:
             dict: 解析結果（エラー時はデフォルト値が入る）
         """
+
+
+        import time
+        import concurrent.futures
+
         prompt = self._construct_prompt(text)
-        
-        try:
-            response = self.model.generate_content(prompt)
-            output = response.text.strip()
-            logger.debug(f"モデル生出力:\n{output}")
-            return self._parse_output(output)
-            
-        except Exception as e:
-            logger.error(f"予期せぬエラー: {str(e)}")
-        
+
+        def call_model():
+            return self.model.generate_content(prompt)
+
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                logger.info(f"Gemini 呼び出し試行 {attempt + 1}/{max_retries + 1}")
+                with concurrent.futures.ThreadPoolExecutor() as executor:
+                    future = executor.submit(call_model)
+                    response = future.result(timeout=10)  # 最大10秒待機
+
+                output = response.text.strip()
+                logger.debug(f"モデル生出力:\n{output}")
+                return self._parse_output(output)
+
+            except concurrent.futures.TimeoutError:
+                logger.warning("⚠️ Gemini API タイムアウト発生")
+            except Exception as e:
+                logger.warning(f"⚠️ Gemini API 呼び出しエラー: {str(e)}")
+
+            time.sleep(1)  # リトライ前に待機
+
+        logger.error("❌ Gemini呼び出しすべて失敗。デフォルト値を返します。")
         return {
             "案件内容": "",
             "必須スキル": [],
