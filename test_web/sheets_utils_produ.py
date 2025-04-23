@@ -43,7 +43,7 @@ def get_gspread_service():
 
 
 
-        flow = InstalledAppFlow.from_client_secrets_file('config/client_secrets.json', SCOPES)
+        flow = InstalledAppFlow.from_client_secrets_file('/Users/mame/ses_extractor/config/client_secrets.json', SCOPES)
         creds = flow.run_local_server(port=0)
         with open(token_path, 'wb') as token:
             pickle.dump(creds, token)
