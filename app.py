@@ -369,13 +369,20 @@ st.header("🧪 Gemini API 接続テスト", divider="rainbow")
 
 if st.button("🚀 Gemini API をテスト実行", key="test_gemini"):
     try:
+        st.write("📌 モデル初期化中...")
         from test_web.gemini_utils_produ import get_gemini_model
         model = get_gemini_model()
+        st.write("✅ モデル取得成功")
+
         prompt = "これはテストです。Gemini APIが正常に動作しているか確認しています。"
+        st.write("📤 プロンプト送信中...")
         response = model.generate_content(prompt)
+        st.write("✅ 応答取得成功")
+
         st.success("✅ Gemini API 接続成功！")
         st.markdown(f"**Geminiの応答内容：**\n\n> {response.text}")
     except Exception as e:
         st.error(f"❌ Gemini API テスト失敗: {str(e)}")
+
 
 
