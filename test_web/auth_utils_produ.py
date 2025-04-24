@@ -180,9 +180,14 @@
 import os
 import secrets
 import streamlit as st
+import pandas as pd
+import json
+import pickle
+import unicodedata
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
 
 SCOPES = [
     "https://www.googleapis.com/auth/gmail.readonly",
@@ -248,15 +253,12 @@ def get_sheets_service():
     return None
 
 # 在主页使用的登录函数
+
 def display_google_login():
-    """在主页显示Google登录按钮并处理认证流程"""
     if 'credentials' not in st.session_state:
-        # 准备OAuth流程
         oauth_secrets = st.secrets["google_oauth"]
-        
-        # 确保重定向URI正确
         redirect_uri = oauth_secrets["redirect_uris"][0] if isinstance(oauth_secrets["redirect_uris"], list) else oauth_secrets["redirect_uris"]
-        
+
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -266,24 +268,23 @@ def display_google_login():
                     "auth_uri": oauth_secrets["auth_uri"],
                     "token_uri": oauth_secrets["token_uri"],
                     "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
-                    "redirect_uris": [redirect_uri]  # 确保是列表形式
+                    "redirect_uris": [redirect_uri]
                 }
             },
             scopes=SCOPES,
             redirect_uri=redirect_uri
         )
-        
-        # 生成并保存state
+
         oauth_state = secrets.token_urlsafe(16)
         st.session_state['oauth_state'] = oauth_state
-        
+
         auth_url, _ = flow.authorization_url(
             prompt='consent',
             state=oauth_state,
             access_type='offline',
             include_granted_scopes='true'
         )
-        
+
         if st.button("Googleアカウントでログイン", key="google_login"):
             st.session_state['auth_url'] = auth_url
             st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
