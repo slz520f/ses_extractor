@@ -254,7 +254,9 @@ def display_google_login():
         # 准备OAuth流程
         oauth_secrets = st.secrets["google_oauth"]
         
-        # 使用 `client_id` 和 `client_secret` 从 secrets.toml 中获取信息
+        # 确保重定向URI正确
+        redirect_uri = oauth_secrets["redirect_uris"][0] if isinstance(oauth_secrets["redirect_uris"], list) else oauth_secrets["redirect_uris"]
+        
         flow = Flow.from_client_config(
             {
                 "web": {
@@ -264,11 +266,11 @@ def display_google_login():
                     "auth_uri": oauth_secrets["auth_uri"],
                     "token_uri": oauth_secrets["token_uri"],
                     "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
-                    "redirect_uris": oauth_secrets["redirect_uris"]
+                    "redirect_uris": [redirect_uri]  # 确保是列表形式
                 }
             },
             scopes=SCOPES,
-            redirect_uri=st.secrets.get('REDIRECT_URI', "https://ew4cdpjavj2nyqgqwbme7y.streamlit.app/")
+            redirect_uri=redirect_uri
         )
         
         # 生成并保存state
@@ -282,7 +284,6 @@ def display_google_login():
             include_granted_scopes='true'
         )
         
-        # 显示登录按钮（直接使用Streamlit按钮）
         if st.button("Googleアカウントでログイン", key="google_login"):
             st.session_state['auth_url'] = auth_url
             st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)

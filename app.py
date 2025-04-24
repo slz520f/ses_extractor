@@ -104,10 +104,10 @@ import streamlit as st
 import pandas as pd
 from test_web.auth_utils_produ import  get_gmail_service, get_sheets_service
 from test_web.gmail_utils import fetch_ses_emails
-from test_web.sheets_utils_produ import export_to_sheet
+from test_web.sheets_utils_produ import export_to_sheet,get_gspread_service
 from test_web.gemini_utils_produ import parse_emails_with_gemini
 import os
-
+from google.auth.exceptions import RefreshError
 import time
 
 import secrets
@@ -378,7 +378,7 @@ if 'credentials' in st.session_state:
         else:
             with st.spinner('Google Sheetsに書き込み中...'):
                 try:
-                    service = get_sheets_service()
+                    service = get_gspread_service()  # 确保使用正确的函数名
                     if service is None:
                         st.error("Google Sheetsサービスに接続できませんでした。認証を確認してください。")
                     else:
@@ -388,6 +388,11 @@ if 'credentials' in st.session_state:
                             sheet_name=sheet_name
                         )
                         st.success("✅ Google Sheetsへの書き込みが完了しました！")
+                except RefreshError:
+                    st.error("セッションがタイムアウトしました。再度ログインしてください。")
+                    if 'credentials' in st.session_state:
+                        del st.session_state['credentials']
+                    st.rerun()
                 except Exception as e:
                     st.error(f"書き込み中にエラーが発生しました: {str(e)}")
 
