@@ -394,7 +394,7 @@ if 'credentials' in st.session_state:
 
 
 # 追加：Gemini API テスト
-st.header("🧪 Gemini API 接続テスト", divider="rainbow")
+#st.header("🧪 Gemini API 接続テスト", divider="rainbow")
 
         
         
