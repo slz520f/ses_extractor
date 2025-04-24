@@ -45,7 +45,7 @@ def get_gspread_service():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # 🔄 用 from_client_config 构造 flow（不再使用 json 文件）
+            # 🔑 用 from_client_config 创建 Flow 实例（不再使用 json 文件）
             oauth_secrets = st.secrets["google_oauth"]
 
             flow = Flow.from_client_config(
@@ -53,23 +53,33 @@ def get_gspread_service():
                     "web": {
                         "client_id": oauth_secrets["client_id"],
                         "client_secret": oauth_secrets["client_secret"],
-                        "project_id": oauth_secrets["project_id"],
                         "auth_uri": oauth_secrets["auth_uri"],
                         "token_uri": oauth_secrets["token_uri"],
                         "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
                         "redirect_uris": oauth_secrets["redirect_uris"]
                     }
                 },
-                SCOPES
+                scopes=SCOPES,
+                redirect_uri=oauth_secrets["redirect_uris"][0]
             )
-            creds = flow.run_local_server(port=0)
 
-            # 保存 token
-            with open(token_path, 'wb') as token:
-                pickle.dump(creds, token)
+            if 'code' not in st.query_params:
+                # 📤 第一次认证：生成 URL 并引导用户登录
+                auth_url, state = flow.authorization_url(prompt='consent')
+                st.session_state['oauth_state'] = state
+                st.markdown(f"[👉 Googleでログイン]({auth_url})")
+                st.stop()  # ⛔ 停止执行，等待用户点击链接并返回
+            else:
+                # 🔁 用户授权后返回，使用 code 获取 token
+                flow.fetch_token(code=st.query_params['code'])
+                creds = flow.credentials
 
+                # 💾 保存凭证
+                with open(token_path, 'wb') as token:
+                    pickle.dump(creds, token)
+
+    # ✅ 构建并返回 Google Sheets API 客户端
     return build('sheets', 'v4', credentials=creds)
-
 def export_to_sheet(email_data_list,spreadsheet_id, sheet_name="シート1"):
     if not email_data_list:
         print("📭 有効なメールデータが見つかりませんでした")
