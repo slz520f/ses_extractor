@@ -4,8 +4,9 @@ import json
 import os
 import pickle
 import streamlit as st
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/spreadsheets']
 def sanitize_text(text):
@@ -39,22 +40,33 @@ def get_gspread_service():
         with open(token_path, 'rb') as token:
             creds = pickle.load(token)
 
+    # 如果没有或已经失效，走OAuth流程
     if not creds or not creds.valid:
-        # 1. 从 st.secrets 读取 JSON
-        client_secrets_dict = json.loads(st.secrets["google_oauth"]["client_secrets"])
-        
-        # 2. 写入临时文件
-        secrets_file_path = '/tmp/client_secrets.json'
-        with open(secrets_file_path, 'w') as f:
-            json.dump(client_secrets_dict, f)
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # 🔄 用 from_client_config 构造 flow（不再使用 json 文件）
+            oauth_secrets = st.secrets["google_oauth"]
 
-        # 3. 用 OAuth Flow
-        flow = InstalledAppFlow.from_client_secrets_file(secrets_file_path, SCOPES)
-        creds = flow.run_local_server(port=0)
+            flow = Flow.from_client_config(
+                {
+                    "web": {
+                        "client_id": oauth_secrets["client_id"],
+                        "client_secret": oauth_secrets["client_secret"],
+                        "project_id": oauth_secrets["project_id"],
+                        "auth_uri": oauth_secrets["auth_uri"],
+                        "token_uri": oauth_secrets["token_uri"],
+                        "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
+                        "redirect_uris": oauth_secrets["redirect_uris"]
+                    }
+                },
+                SCOPES
+            )
+            creds = flow.run_local_server(port=0)
 
-        # 4. 保存 tokeng
-        with open(token_path, 'wb') as token:
-            pickle.dump(creds, token)
+            # 保存 token
+            with open(token_path, 'wb') as token:
+                pickle.dump(creds, token)
 
     return build('sheets', 'v4', credentials=creds)
 
