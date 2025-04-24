@@ -225,24 +225,23 @@ def handle_authentication():
             del st.session_state['credentials']
             return False
     
-    # # 尝试从URL参数获取code进行自动认证
-    # code = st.query_params.get('code')
-    # if code:
-    #     try:
-    #         flow = get_oauth_flow()
-    #         if flow is None:
-    #             return False
+    # 尝试从URL参数获取code进行自动认证
+    code = st.query_params.get('code')
+    if code:
+        try:
+            flow = get_oauth_flow()
+            if flow is None:
+                return False
                 
-    #         flow.fetch_token(code=code)
-    #         st.session_state['credentials'] = flow.credentials
-    #         st.rerun()
-    #         return True
-    #     except Exception as e:
-    #         st.error(f"認証処理エラー: {str(e)}")
-    #         return False
-    # 如果没有凭证，调用 display_google_login 显示登录按钮
-    if not 'credentials' in st.session_state:
-        display_google_login()
+            flow.fetch_token(code=code)
+            st.session_state['credentials'] = flow.credentials
+            st.rerun()
+            return True
+        except Exception as e:
+            st.error(f"認証処理エラー: {str(e)}")
+            return False
+    
+    
     
     return False
 
