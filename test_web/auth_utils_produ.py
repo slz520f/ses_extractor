@@ -257,7 +257,7 @@ def display_google_login():
         # 使用 `client_id` 和 `client_secret` 从 secrets.toml 中获取信息
         flow = Flow.from_client_config(
             {
-                "installed": {
+                "web": {
                     "client_id": oauth_secrets["client_id"],
                     "client_secret": oauth_secrets["client_secret"],
                     "project_id": oauth_secrets["project_id"],
