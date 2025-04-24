@@ -102,7 +102,7 @@
 
 import streamlit as st
 import pandas as pd
-from test_web.auth_utils_produ import  display_google_login, get_gmail_service, get_sheets_service
+from test_web.auth_utils_produ import  get_gmail_service,get_gspread_service
 from test_web.gmail_utils import fetch_ses_emails
 from test_web.sheets_utils_produ import export_to_sheet
 from test_web.gemini_utils_produ import parse_emails_with_gemini
@@ -171,19 +171,122 @@ st.markdown("""
 
 
 
-
+def get_oauth_flow():
+    """获取OAuth流程对象，兼容本地和Streamlit Cloud环境"""
+    try:
+        # 生产环境使用secrets
+        if st.secrets.get("google_oauth"):
+            client_config = {
+                "web": st.secrets["google_oauth"]
+            }
+            return Flow.from_client_config(
+                client_config,
+                scopes=[
+                    "https://www.googleapis.com/auth/gmail.readonly",
+                    "https://www.googleapis.com/auth/spreadsheets"
+                ],
+                redirect_uri=st.secrets.get("REDIRECT_URI", "https://ew4cdpjavj2nyqgqwbme7y.streamlit.app/")
+            )
+        
+        # 本地开发使用文件
+        client_secrets_path = os.path.join(os.path.dirname(__file__), 'config/client_secrets.json')
+        if os.path.exists(client_secrets_path):
+            return Flow.from_client_secrets_file(
+                client_secrets_path,
+                scopes=[
+                    "https://www.googleapis.com/auth/gmail.readonly",
+                    "https://www.googleapis.com/auth/spreadsheets"
+                ],
+                redirect_uri="http://localhost:8501/"
+            )
+        
+        st.error("OAuth配置未找到。请在本地创建config/client_secrets.json或在Streamlit Cloud配置secrets")
+        return None
+        
+    except Exception as e:
+        st.error(f"OAuth初始化失败: {str(e)}")
+        return None
+    
+# 认证状态检查与处理
+def handle_authentication():
+    # 检查现有凭证
+    if 'credentials' in st.session_state:
+        try:
+            # 验证凭证是否有效
+            if not st.session_state['credentials'].valid:
+                if st.session_state['credentials'].expired and st.session_state['credentials'].refresh_token:
+                    st.session_state['credentials'].refresh(Request())
+                else:
+                    del st.session_state['credentials']
+                    return False
+            return True
+        except Exception as e:
+            st.error(f"認証エラー: {str(e)}")
+            del st.session_state['credentials']
+            return False
+    
+    # 尝试从URL参数获取code进行自动认证
+    code = st.query_params.get('code')
+    if code:
+        try:
+            flow = get_oauth_flow()
+            if flow is None:
+                return False
+                
+            flow.fetch_token(code=code)
+            st.session_state['credentials'] = flow.credentials
+            st.rerun()
+            return True
+        except Exception as e:
+            st.error(f"認証処理エラー: {str(e)}")
+            return False
+    
+    return False
 
 # 认证部分
 st.header("🔐 Google アカウント認証", divider="rainbow")
 
-display_google_login()
+if handle_authentication():
+    st.markdown("""
+    <div class="success-box">
+        ✅ <strong>認証済み</strong> - システムを使用する準備ができました
+    </div>
+    """, unsafe_allow_html=True)
+    
+    if st.button("🔓 ログアウト", key="logout_btn"):
+        del st.session_state['credentials']
+        st.rerun()
+else:
+    st.markdown("""
+    <div style="margin-bottom:20px;">
+        <p>このシステムを使用するには、まずGoogleアカウントで認証してください。</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 准备OAuth流程
+    flow = get_oauth_flow()
+    if flow is not None:
+        # 生成并保存state
+        oauth_state = secrets.token_urlsafe(16)
+        st.session_state['oauth_state'] = oauth_state
+        
+        auth_url, _ = flow.authorization_url(
+            prompt='consent',
+            state=oauth_state,
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+    
+    # 单一登录按钮
+    if st.button("Googleでログイン", key="google_login", help="Googleアカウントで認証します"):
+        st.session_state['auth_url'] = auth_url
+        # st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+        st.write(f"[👉 Googleでログイン]({auth_url})", unsafe_allow_html=True)
 
 
 # 功能部分 (仅认证用户可见)
-if st.session_state.get("gmail_authenticated") and st.session_state.get("sheets_authenticated"):
-    st.header("📥 メール取得・解析")
-    gmail = get_gmail_service()
-    sheets = get_sheets_service()
+if 'credentials' in st.session_state:
+    st.header("📥 メール取得・解析", divider="rainbow")
     
     # 邮件获取与解析
     col1, col2 = st.columns(2)
@@ -275,7 +378,7 @@ if st.session_state.get("gmail_authenticated") and st.session_state.get("sheets_
         else:
             with st.spinner('Google Sheetsに書き込み中...'):
                 try:
-                    service =get_sheets_service()  # 确保使用正确的函数名
+                    service = get_gspread_service()  # 确保使用正确的函数名
                     if service is None:
                         st.error("Google Sheetsサービスに接続できませんでした。認証を確認してください。")
                     else:
