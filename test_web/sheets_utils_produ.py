@@ -39,71 +39,99 @@ def get_gspread_service():
     creds = None
     token_path = '/tmp/token_sheets.pickle'
     
-    # 检查并删除可能无效的旧令牌
+    # トークンがあれば読み込み
     if os.path.exists(token_path):
         try:
             with open(token_path, 'rb') as token:
                 creds = pickle.load(token)
+            # トークンが期限切れなら更新
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
+                # 更新したトークンを保存
+                with open(token_path, 'wb') as token:
+                    pickle.dump(creds, token)
         except (RefreshError, pickle.UnpicklingError) as e:
-            os.unlink(token_path)  # 删除无效的令牌文件
+            os.unlink(token_path)
             creds = None
             st.warning("セッションが期限切れです。再度ログインしてください。")
 
+    # 有効なトークンがない場合
     if not creds or not creds.valid:
         oauth_secrets = st.secrets["google_oauth"]
-        redirect_uri = oauth_secrets["redirect_uris"][0]  # 确保使用第一个重定向URI
+        redirect_uri = oauth_secrets["redirect_uris"][0]
 
-        flow = Flow.from_client_config(
-            {
-                "web": {
-                    "client_id": oauth_secrets["client_id"],
-                    "client_secret": oauth_secrets["client_secret"],
-                    "auth_uri": oauth_secrets["auth_uri"],
-                    "token_uri": oauth_secrets["token_uri"],
-                    "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
-                    "redirect_uris": [redirect_uri]
-                }
-            },
-            scopes=SCOPES,
-            redirect_uri=redirect_uri
-        )
-
+        # 初回アクセス時の処理
         if 'code' not in st.query_params:
-            # 添加state参数防止CSRF攻击
-            state = secrets.token_urlsafe(16)
-            st.session_state['oauth_state'] = state
+            # stateパラメータ生成と保存
+            if 'oauth_state' not in st.session_state:
+                st.session_state['oauth_state'] = secrets.token_urlsafe(16)
+            
+            flow = Flow.from_client_config(
+                client_config={
+                    "web": {
+                        "client_id": oauth_secrets["client_id"],
+                        "client_secret": oauth_secrets["client_secret"],
+                        "auth_uri": oauth_secrets["auth_uri"],
+                        "token_uri": oauth_secrets["token_uri"],
+                        "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
+                        "redirect_uris": [redirect_uri]
+                    }
+                },
+                scopes=SCOPES,
+                redirect_uri=redirect_uri
+            )
             
             auth_url, _ = flow.authorization_url(
                 access_type='offline',
                 prompt='consent',
-                state=state,
+                state=st.session_state['oauth_state'],
                 include_granted_scopes='true'
             )
-            st.markdown(f"[👉 Googleで再ログイン]({auth_url})")
+            st.markdown(f"[👉 Googleでログイン]({auth_url})")
             st.stop()
+        
+        # コールバック時の処理
         else:
             try:
-                # 验证state参数防止CSRF攻击
-                if st.query_params.get('state') != st.session_state.get('oauth_state'):
-                    st.error("セキュリティ検証に失敗しました。再度お試しください。")
+                # stateパラメータの検証
+                if 'state' not in st.query_params or st.query_params['state'] != st.session_state.get('oauth_state'):
+                    st.error("セキュリティトークンが一致しません。最初からやり直してください。")
+                    if 'oauth_state' in st.session_state:
+                        del st.session_state['oauth_state']
                     st.stop()
                 
+                flow = Flow.from_client_config(
+                    client_config={
+                        "web": {
+                            "client_id": oauth_secrets["client_id"],
+                            "client_secret": oauth_secrets["client_secret"],
+                            "auth_uri": oauth_secrets["auth_uri"],
+                            "token_uri": oauth_secrets["token_uri"],
+                            "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
+                            "redirect_uris": [redirect_uri]
+                        }
+                    },
+                    scopes=SCOPES,
+                    redirect_uri=redirect_uri,
+                    state=st.session_state['oauth_state']
+                )
+                
+                # トークンを取得
                 flow.fetch_token(code=st.query_params["code"])
                 creds = flow.credentials
                 
-                # 保存新令牌
+                # トークンを保存
                 with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
-                    
-                # 清除code参数防止重复使用
-                st.query_params.clear()
+                
+                # セッション状態をクリア
+                if 'oauth_state' in st.session_state:
+                    del st.session_state['oauth_state']
+                
+                st.rerun()  # クエリパラメータをクリアするために再読み込み
                 
             except Exception as e:
-                st.error(f"認証失敗: {str(e)}")
-                if 'credentials' in st.session_state:
-                    del st.session_state['credentials']
+                st.error(f"認証エラーが発生しました: {str(e)}")
                 st.stop()
 
     return build('sheets', 'v4', credentials=creds)
