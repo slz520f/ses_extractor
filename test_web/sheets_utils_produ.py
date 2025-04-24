@@ -7,6 +7,9 @@ import streamlit as st
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
+import secrets  #
+
 
 SCOPES = ['https://www.googleapis.com/auth/gmail.readonly', 'https://www.googleapis.com/auth/spreadsheets']
 def sanitize_text(text):
@@ -35,24 +38,22 @@ def normalize_email_data(email_data_list):
 def get_gspread_service():
     creds = None
     token_path = '/tmp/token_sheets.pickle'
-
+    
+    # 检查并删除可能无效的旧令牌
     if os.path.exists(token_path):
-        with open(token_path, 'rb') as token:
-            creds = pickle.load(token)
-        # 检查令牌是否有效
-        if creds and creds.expired and creds.refresh_token:
-            try:
+        try:
+            with open(token_path, 'rb') as token:
+                creds = pickle.load(token)
+            if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-                with open(token_path, 'wb') as token:
-                    pickle.dump(creds, token)
-            except Exception as e:
-                st.warning(f"刷新令牌失败: {str(e)}")
-                os.unlink(token_path)  # 删除无效的令牌文件
-                creds = None
+        except (RefreshError, pickle.UnpicklingError) as e:
+            os.unlink(token_path)  # 删除无效的令牌文件
+            creds = None
+            st.warning("セッションが期限切れです。再度ログインしてください。")
 
     if not creds or not creds.valid:
         oauth_secrets = st.secrets["google_oauth"]
-        redirect_uri = oauth_secrets["redirect_uris"][0] if isinstance(oauth_secrets["redirect_uris"], list) else oauth_secrets["redirect_uris"]
+        redirect_uri = oauth_secrets["redirect_uris"][0]  # 确保使用第一个重定向URI
 
         flow = Flow.from_client_config(
             {
@@ -70,22 +71,39 @@ def get_gspread_service():
         )
 
         if 'code' not in st.query_params:
-            auth_url, state = flow.authorization_url(
+            # 添加state参数防止CSRF攻击
+            state = secrets.token_urlsafe(16)
+            st.session_state['oauth_state'] = state
+            
+            auth_url, _ = flow.authorization_url(
                 access_type='offline',
                 prompt='consent',
+                state=state,
                 include_granted_scopes='true'
             )
-            st.session_state['oauth_state'] = state
-            st.markdown(f"[👉 Googleでログイン]({auth_url})")
+            st.markdown(f"[👉 Googleで再ログイン]({auth_url})")
             st.stop()
         else:
             try:
+                # 验证state参数防止CSRF攻击
+                if st.query_params.get('state') != st.session_state.get('oauth_state'):
+                    st.error("セキュリティ検証に失敗しました。再度お試しください。")
+                    st.stop()
+                
                 flow.fetch_token(code=st.query_params["code"])
                 creds = flow.credentials
+                
+                # 保存新令牌
                 with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
+                    
+                # 清除code参数防止重复使用
+                st.query_params.clear()
+                
             except Exception as e:
-                st.error(f"认证失败: {str(e)}")
+                st.error(f"認証失敗: {str(e)}")
+                if 'credentials' in st.session_state:
+                    del st.session_state['credentials']
                 st.stop()
 
     return build('sheets', 'v4', credentials=creds)
