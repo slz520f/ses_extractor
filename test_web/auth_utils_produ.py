@@ -301,11 +301,11 @@ def validate_credentials(creds):
 
 #整合过的认证
 def unified_auth_flow(service_type='sheets'):
-    """統合認証フロー"""
+    """统一认证入口"""
     token_path = f'/tmp/token_{service_type}.pickle'
     creds = None
     
-    # トークン検証
+    # Token存在且有效时直接返回
     if os.path.exists(token_path):
         try:
             with open(token_path, 'rb') as token:
@@ -318,11 +318,12 @@ def unified_auth_flow(service_type='sheets'):
             os.unlink(token_path)
             creds = None
 
+    # 需要重新认证的情况
     if not creds or not creds.valid:
         oauth_secrets = st.secrets["google_oauth"]
         redirect_uri = oauth_secrets["redirect_uris"][0]
 
-        # State管理の強化
+        # 初始化state
         if 'oauth_state' not in st.session_state:
             st.session_state['oauth_state'] = secrets.token_urlsafe(32)
 
@@ -342,41 +343,39 @@ def unified_auth_flow(service_type='sheets'):
             state=st.session_state['oauth_state']
         )
 
-        # 認証開始
-        if 'code' not in st.query_params:
-            auth_url, _ = flow.authorization_url(
-                access_type='offline',
-                prompt='consent',
-                include_granted_scopes='true'
-            )
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
-            st.stop()
-
-        # コールバック処理
-        else:
+        # 处理OAuth回调
+        if 'code' in st.query_params:
             try:
-                # State検証
+                # 验证state
                 if st.query_params.get('state') != st.session_state.get('oauth_state'):
-                    raise ValueError("セキュリティトークン不一致")
-
+                    raise ValueError("State mismatch")
+                
                 flow.fetch_token(code=st.query_params["code"])
                 creds = flow.credentials
                 
-                # クエリパラメータクリア
-                st.experimental_set_query_params()
-                del st.session_state['oauth_state']
-                
-                # トークン保存
+                # 保存token
                 with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
-
+                
+                # 清理状态
+                st.experimental_set_query_params()
+                del st.session_state['oauth_state']
                 st.rerun()
-
+                
             except Exception as e:
                 st.error(f"認証エラー: {str(e)}")
                 if os.path.exists(token_path):
                     os.unlink(token_path)
                 st.stop()
+        else:
+            # 发起认证请求
+            auth_url, _ = flow.authorization_url(
+                prompt='consent',
+                access_type='offline',
+                include_granted_scopes='true'
+            )
+            st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+            st.stop()
 
     return creds
 
