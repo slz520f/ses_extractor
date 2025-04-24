@@ -246,8 +246,7 @@ st.markdown("""
 # 认证部分
 st.header("🔐 Google アカウント認証", divider="rainbow")
 
-# 显示登录状态并处理认证流程
-display_google_login()  # 使用整合后的登录组件
+display_google_login()
 # if handle_authentication():
 #     st.markdown("""
 #     <div class="success-box">
@@ -286,15 +285,15 @@ display_google_login()  # 使用整合后的登录组件
 #         st.write(f"[👉 Googleでログイン]({auth_url})", unsafe_allow_html=True)
 
 
-# 功能部分 (仅认证用户可见)
-# if 'credentials' in st.session_state:
-if 'gmail_authenticated' in st.session_state and st.session_state['gmail_authenticated'] \
-   and 'sheets_authenticated' in st.session_state and st.session_state['sheets_authenticated']:
-    st.markdown("""
-    <div class="success-box">
-        ✅ <strong>認証済み</strong> - システムを使用する準備ができました
-    </div>
-    """, unsafe_allow_html=True)
+#功能部分 (仅认证用户可见)
+if 'credentials' in st.session_state:
+    if 'gmail_authenticated' in st.session_state and st.session_state['gmail_authenticated'] \
+    and 'sheets_authenticated' in st.session_state and st.session_state['sheets_authenticated']:
+        st.markdown("""
+        <div class="success-box">
+            ✅ <strong>認証済み</strong> - システムを使用する準備ができました
+        </div>
+        """, unsafe_allow_html=True)
     st.header("📥 メール取得・解析", divider="rainbow")
     
     # 邮件获取与解析
