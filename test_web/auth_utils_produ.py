@@ -252,8 +252,21 @@ def display_google_login():
     """在主页显示Google登录按钮并处理认证流程"""
     if 'credentials' not in st.session_state:
         # 准备OAuth流程
-        flow = Flow.from_client_secrets_file(
-            'config/client_secrets.json',
+        oauth_secrets = st.secrets["google_oauth"]
+        
+        # 使用 `client_id` 和 `client_secret` 从 secrets.toml 中获取信息
+        flow = Flow.from_client_config(
+            {
+                "installed": {
+                    "client_id": oauth_secrets["client_id"],
+                    "client_secret": oauth_secrets["client_secret"],
+                    "project_id": oauth_secrets["project_id"],
+                    "auth_uri": oauth_secrets["auth_uri"],
+                    "token_uri": oauth_secrets["token_uri"],
+                    "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
+                    "redirect_uris": oauth_secrets["redirect_uris"]
+                }
+            },
             scopes=SCOPES,
             redirect_uri=st.secrets.get('REDIRECT_URI', "https://ew4cdpjavj2nyqgqwbme7y.streamlit.app/")
         )
