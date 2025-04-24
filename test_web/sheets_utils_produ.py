@@ -39,66 +39,54 @@ def get_gspread_service():
     if os.path.exists(token_path):
         with open(token_path, 'rb') as token:
             creds = pickle.load(token)
-
-    if not creds or not creds.valid:
+        # 检查令牌是否有效
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            oauth_secrets = st.secrets["google_oauth"]
-
-            # 准备 Flow（注意不要放在 if/else 外面）
-            flow = Flow.from_client_config(
-                {
-                    "web": {
-                        "client_id": oauth_secrets["client_id"],
-                        "client_secret": oauth_secrets["client_secret"],
-                        "auth_uri": oauth_secrets["auth_uri"],
-                        "token_uri": oauth_secrets["token_uri"],
-                        "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
-                        "redirect_uris": oauth_secrets["redirect_uris"]
-                    }
-                },
-                scopes=SCOPES
-            )
-            flow.redirect_uri = oauth_secrets["redirect_uris"][0]
-
-            if 'code' not in st.query_params:
-                # 初次访问，生成 URL
-                auth_url, state = flow.authorization_url(
-                    access_type='offline',
-                    prompt='consent',
-                    include_granted_scopes='true'
-                )
-                # 保存 state
-                st.session_state['oauth_state'] = state
-
-                st.markdown(f"[👉 Googleでログイン]({auth_url})")
-                st.stop()
-            else:
-                # 用户跳转回来，构造 flow 并使用 code
-                # ⚠️ 再次构造 flow 实例（必须设置相同的 state）
-                flow = Flow.from_client_config(
-                    {
-                        "web": {
-                            "client_id": oauth_secrets["client_id"],
-                            "client_secret": oauth_secrets["client_secret"],
-                            "auth_uri": oauth_secrets["auth_uri"],
-                            "token_uri": oauth_secrets["token_uri"],
-                            "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
-                            "redirect_uris": oauth_secrets["redirect_uris"]
-                        }
-                    },
-                    scopes=SCOPES,
-                    state=st.session_state.get("oauth_state")  # 用保存的 state
-                )
-                flow.redirect_uri = oauth_secrets["redirect_uris"][0]
-
-                # 使用 code 换取 token
-                flow.fetch_token(code=st.query_params["code"])
-                creds = flow.credentials
-
+            try:
+                creds.refresh(Request())
                 with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
+            except Exception as e:
+                st.warning(f"刷新令牌失败: {str(e)}")
+                os.unlink(token_path)  # 删除无效的令牌文件
+                creds = None
+
+    if not creds or not creds.valid:
+        oauth_secrets = st.secrets["google_oauth"]
+        redirect_uri = oauth_secrets["redirect_uris"][0] if isinstance(oauth_secrets["redirect_uris"], list) else oauth_secrets["redirect_uris"]
+
+        flow = Flow.from_client_config(
+            {
+                "web": {
+                    "client_id": oauth_secrets["client_id"],
+                    "client_secret": oauth_secrets["client_secret"],
+                    "auth_uri": oauth_secrets["auth_uri"],
+                    "token_uri": oauth_secrets["token_uri"],
+                    "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
+                    "redirect_uris": [redirect_uri]
+                }
+            },
+            scopes=SCOPES,
+            redirect_uri=redirect_uri
+        )
+
+        if 'code' not in st.query_params:
+            auth_url, state = flow.authorization_url(
+                access_type='offline',
+                prompt='consent',
+                include_granted_scopes='true'
+            )
+            st.session_state['oauth_state'] = state
+            st.markdown(f"[👉 Googleでログイン]({auth_url})")
+            st.stop()
+        else:
+            try:
+                flow.fetch_token(code=st.query_params["code"])
+                creds = flow.credentials
+                with open(token_path, 'wb') as token:
+                    pickle.dump(creds, token)
+            except Exception as e:
+                st.error(f"认证失败: {str(e)}")
+                st.stop()
 
     return build('sheets', 'v4', credentials=creds)
 
