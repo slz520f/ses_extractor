@@ -177,32 +177,32 @@
 
 
 
-import os
-import secrets
-import streamlit as st
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-from google.auth.transport.requests import Request
-from google.auth.exceptions import RefreshError
-import pickle
+# import os
+# import secrets
+# import streamlit as st
+# from google_auth_oauthlib.flow import Flow
+# from googleapiclient.discovery import build
+# from google.auth.transport.requests import Request
+# from google.auth.exceptions import RefreshError
+# import pickle
 
-SCOPES = [
-    "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/spreadsheets"
-]
+# SCOPES = [
+#     "https://www.googleapis.com/auth/gmail.readonly",
+#     "https://www.googleapis.com/auth/spreadsheets"
+# ]
 
-def validate_credentials(creds):
-    """验证并刷新凭证（如果需要）"""
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            try:
-                creds.refresh(Request())
-                return creds
-            except Exception as e:
-                st.error(f"凭证刷新失败: {e}")
-                return None
-        return None
-    return creds
+# def validate_credentials(creds):
+#     """验证并刷新凭证（如果需要）"""
+#     if not creds or not creds.valid:
+#         if creds and creds.expired and creds.refresh_token:
+#             try:
+#                 creds.refresh(Request())
+#                 return creds
+#             except Exception as e:
+#                 st.error(f"凭证刷新失败: {e}")
+#                 return None
+#         return None
+#     return creds
 
 # def get_google_credentials():
 #     """获取有效的Google凭证"""
@@ -300,143 +300,142 @@ def validate_credentials(creds):
 
 
 #整合过的认证
-def unified_auth_flow(service_type='sheets'):
-    """統合認証フロー"""
-    token_path = f'/tmp/token_{service_type}.pickle'
-    creds = None
-    
-    # トークン検証
+import os
+import pickle
+import secrets
+import streamlit as st
+from google_auth_oauthlib.flow import Flow
+from googleapiclient.discovery import build
+from google.auth.transport.requests import Request
+from google.auth.exceptions import RefreshError
+
+SCOPES = [
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/spreadsheets"
+]
+
+def get_token_path(service_type):
+    return f"/tmp/token_{service_type}.pickle"
+
+def load_credentials(service_type):
+    token_path = get_token_path(service_type)
     if os.path.exists(token_path):
         try:
-            with open(token_path, 'rb') as token:
+            with open(token_path, "rb") as token:
                 creds = pickle.load(token)
             if creds and creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-                with open(token_path, 'wb') as token:
+                with open(token_path, "wb") as token:
                     pickle.dump(creds, token)
-        except (RefreshError, pickle.UnpicklingError):
+            if creds and creds.valid:
+                st.session_state[f"{service_type}_authenticated"] = True
+                return creds
+        except Exception as e:
+            st.error(f"認証トークンの読み込みに失敗: {e}")
             os.unlink(token_path)
-            creds = None
+    return None
 
-    if not creds or not creds.valid:
-        oauth_secrets = st.secrets["google_oauth"]
-        redirect_uri = oauth_secrets["redirect_uris"][0]
+def save_credentials(service_type, creds):
+    with open(get_token_path(service_type), "wb") as token:
+        pickle.dump(creds, token)
+    st.session_state[f"{service_type}_authenticated"] = True
 
-        # State管理の強化
-        if 'oauth_state' not in st.session_state:
-            st.session_state['oauth_state'] = secrets.token_urlsafe(32)
+def create_flow(service_type, state_token=None):
+    oauth = st.secrets["google_oauth"]
+    redirect_uri = oauth["redirect_uris"][0]
+    flow = Flow.from_client_config(
+        client_config={
+            "web": {
+                "client_id": oauth["client_id"],
+                "client_secret": oauth["client_secret"],
+                "auth_uri": oauth["auth_uri"],
+                "token_uri": oauth["token_uri"],
+                "auth_provider_x509_cert_url": oauth["auth_provider_x509_cert_url"],
+                "redirect_uris": [redirect_uri]
+            }
+        },
+        scopes=SCOPES,
+        redirect_uri=redirect_uri,
+        state=state_token,
+    )
+    return flow
 
-        flow = Flow.from_client_config(
-            client_config={
-                "web": {
-                    "client_id": oauth_secrets["client_id"],
-                    "client_secret": oauth_secrets["client_secret"],
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                    "redirect_uris": [redirect_uri]
-                }
-            },
-            scopes=SCOPES,
-            redirect_uri=redirect_uri,
-            state=st.session_state['oauth_state']
+def unified_auth_flow(service_type):
+    creds = load_credentials(service_type)
+    if creds:
+        return creds
+
+    # 初期state生成
+    if "oauth_state" not in st.session_state:
+        st.session_state["oauth_state"] = secrets.token_urlsafe(32)
+
+    flow = create_flow(service_type, state_token=st.session_state["oauth_state"])
+
+    # 認証ステップ
+    if "code" not in st.query_params:
+        auth_url, _ = flow.authorization_url(
+            access_type="offline",
+            prompt="consent",
+            include_granted_scopes="true"
         )
+        st.markdown(f'<meta http-equiv="refresh" content="0; URL={auth_url}">', unsafe_allow_html=True)
+        st.stop()
+    else:
+        try:
+            # セキュリティ検証
+            if st.query_params.get("state") != st.session_state.get("oauth_state"):
+                raise ValueError("State 不一致: セキュリティ警告")
 
-        # 認証開始
-        if 'code' not in st.query_params:
-            auth_url, _ = flow.authorization_url(
-                access_type='offline',
-                prompt='consent',
-                include_granted_scopes='true'
-            )
-            st.markdown(f'<meta http-equiv="refresh" content="0; url={auth_url}">', unsafe_allow_html=True)
+            flow.fetch_token(code=st.query_params["code"])
+            creds = flow.credentials
+            save_credentials(service_type, creds)
+
+            # クエリパラメータを消して再読み込み
+            st.experimental_set_query_params()
+            del st.session_state["oauth_state"]
+            st.rerun()
+
+        except Exception as e:
+            st.error(f"認証に失敗しました: {e}")
             st.stop()
 
-        # コールバック処理
-        else:
-            try:
-                # State検証
-                if st.query_params.get('state') != st.session_state.get('oauth_state'):
-                    raise ValueError("セキュリティトークン不一致")
-
-                flow.fetch_token(code=st.query_params["code"])
-                creds = flow.credentials
-                
-                # クエリパラメータクリア
-                st.experimental_set_query_params()
-                del st.session_state['oauth_state']
-                
-                # トークン保存
-                with open(token_path, 'wb') as token:
-                    pickle.dump(creds, token)
-
-                st.rerun()
-
-            except Exception as e:
-                st.error(f"認証エラー: {str(e)}")
-                if os.path.exists(token_path):
-                    os.unlink(token_path)
-                st.stop()
-
-    return creds
-
 def get_gmail_service():
-    """Gmailサービス取得"""
-    creds = unified_auth_flow('gmail')
-    return build('gmail', 'v1', credentials=creds) if creds else None
+    creds = unified_auth_flow("gmail")
+    return build("gmail", "v1", credentials=creds) if creds else None
 
 def get_sheets_service():
-    """Sheetsサービス取得"""
-    creds = unified_auth_flow('sheets')
-    return build('sheets', 'v4', credentials=creds) if creds else None
+    creds = unified_auth_flow("sheets")
+    return build("sheets", "v4", credentials=creds) if creds else None
 
 def display_google_login():
-    """显示登录/登出按钮"""
-    if os.path.exists('/tmp/token_gmail.pickle') and os.path.exists('/tmp/token_sheets.pickle'):
-        st.success("✅ すでにログイン済みです")
-        if st.button("🔓 ログアウト", key="logout_btn"):
-            for service_type in ['gmail', 'sheets']:
-                token_path = f'/tmp/token_{service_type}.pickle'
-                if os.path.exists(token_path):
-                    os.unlink(token_path)
-            st.rerun()
-    else:
-        st.warning("⚠️ 未認証 - 機能を使用するにはGoogleアカウントでログインしてください")
-        
-        # 准备OAuth流程
-        oauth_secrets = st.secrets["google_oauth"]
-        redirect_uri = oauth_secrets["redirect_uris"][0]
-        
-        # 确保state存在
-        if 'oauth_state' not in st.session_state:
-            st.session_state['oauth_state'] = secrets.token_urlsafe(32)
-        
-        flow = Flow.from_client_config(
-            client_config={
-                "web": {
-                    "client_id": oauth_secrets["client_id"],
-                    "client_secret": oauth_secrets["client_secret"],
-                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-                    "token_uri": "https://oauth2.googleapis.com/token",
-                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
-                    "redirect_uris": [redirect_uri]
-                }
-            },
-            scopes=SCOPES,
-            redirect_uri=redirect_uri,
-            state=st.session_state['oauth_state']
-        )
-        
-        auth_url, _ = flow.authorization_url(
-            prompt='consent',
-            access_type='offline',
-            include_granted_scopes='true'
-        )
-        
-        # 使用st.link_button确保可靠跳转
-        st.link_button(
-            "🔑 Googleでログイン",
-            auth_url,
-            help="Googleアカウントで認証します",
-            type="primary"
-        )
+    gmail_auth = st.session_state.get("gmail_authenticated", False)
+    sheets_auth = st.session_state.get("sheets_authenticated", False)
+
+    col1, col2 = st.columns([4, 1])
+    with col1:
+        if gmail_auth and sheets_auth:
+            st.markdown("""
+            <div class="success-box">
+                ✅ <strong>Google 認証済み</strong> - システムを使用する準備ができました
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("""
+            <div class="error-box">
+                ⚠️ <strong>Google未認証</strong> - 機能を使用するにはログインが必要です
+            </div>
+            """, unsafe_allow_html=True)
+
+    with col2:
+        if gmail_auth and sheets_auth:
+            if st.button("🔓 ログアウト"):
+                for service in ["gmail", "sheets"]:
+                    token_path = get_token_path(service)
+                    if os.path.exists(token_path):
+                        os.unlink(token_path)
+                    st.session_state.pop(f"{service}_authenticated", None)
+                st.rerun()
+        else:
+            if st.button("🔑 Googleでログイン"):
+                unified_auth_flow("gmail")
+

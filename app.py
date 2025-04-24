@@ -288,7 +288,8 @@ display_google_login()  # 使用整合后的登录组件
 
 # 功能部分 (仅认证用户可见)
 # if 'credentials' in st.session_state:
-if os.path.exists('/tmp/token_gmail.pickle') and os.path.exists('/tmp/token_sheets.pickle'):
+if 'gmail_authenticated' in st.session_state and st.session_state['gmail_authenticated'] \
+   and 'sheets_authenticated' in st.session_state and st.session_state['sheets_authenticated']:
     st.markdown("""
     <div class="success-box">
         ✅ <strong>認証済み</strong> - システムを使用する準備ができました
@@ -413,6 +414,7 @@ else:
         ⚠️ <strong>未認証</strong> - 機能を使用するにはGoogleアカウントでログインしてください
     </div>
     """, unsafe_allow_html=True)
+    st.stop()
 
 
 
