@@ -352,7 +352,7 @@ if 'credentials' in st.session_state:
                 else x
             )
 
-    st.dataframe(email_df, use_container_width=True)
+        st.dataframe(email_df, use_container_width=True)
     
     # 导出到Google Sheets
     st.header("📤 データエクスポート", divider="rainbow")
