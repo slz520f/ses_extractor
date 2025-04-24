@@ -242,10 +242,28 @@ def unified_auth_flow(service_type):
     if creds:
         return creds
 
+    # 必须先设置 state
     if "oauth_state" not in st.session_state:
         st.session_state["oauth_state"] = secrets.token_urlsafe(32)
 
-    flow = create_flow(service_type)
+    # 然后用它创建 flow
+    oauth = st.secrets["google_oauth"]
+    redirect_uri = oauth["redirect_uris"][0]
+    flow = Flow.from_client_config(
+        {
+            "web": {
+                "client_id": oauth["client_id"],
+                "client_secret": oauth["client_secret"],
+                "auth_uri": oauth["auth_uri"],
+                "token_uri": oauth["token_uri"],
+                "auth_provider_x509_cert_url": oauth["auth_provider_x509_cert_url"],
+                "redirect_uris": [redirect_uri],
+            }
+        },
+        scopes=SCOPES,
+        redirect_uri=redirect_uri,
+        state=st.session_state["oauth_state"]  # ✅ 用已设置的 state
+    )
 
     if "code" not in st.query_params:
         auth_url, _ = flow.authorization_url(
