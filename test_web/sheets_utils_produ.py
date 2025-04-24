@@ -40,14 +40,13 @@ def get_gspread_service():
         with open(token_path, 'rb') as token:
             creds = pickle.load(token)
 
-    # 如果没有或已经失效，走OAuth流程
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # 🔑 用 from_client_config 创建 Flow 实例（不再使用 json 文件）
             oauth_secrets = st.secrets["google_oauth"]
 
+            # 准备 Flow（注意不要放在 if/else 外面）
             flow = Flow.from_client_config(
                 {
                     "web": {
@@ -59,27 +58,50 @@ def get_gspread_service():
                         "redirect_uris": oauth_secrets["redirect_uris"]
                     }
                 },
-                scopes=SCOPES,
-                redirect_uri=oauth_secrets["redirect_uris"][0]
+                scopes=SCOPES
             )
+            flow.redirect_uri = oauth_secrets["redirect_uris"][0]
 
             if 'code' not in st.query_params:
-                # 📤 第一次认证：生成 URL 并引导用户登录
-                auth_url, state = flow.authorization_url(prompt='consent')
+                # 初次访问，生成 URL
+                auth_url, state = flow.authorization_url(
+                    access_type='offline',
+                    prompt='consent',
+                    include_granted_scopes='true'
+                )
+                # 保存 state
                 st.session_state['oauth_state'] = state
+
                 st.markdown(f"[👉 Googleでログイン]({auth_url})")
-                st.stop()  # ⛔ 停止执行，等待用户点击链接并返回
+                st.stop()
             else:
-                # 🔁 用户授权后返回，使用 code 获取 token
-                flow.fetch_token(code=st.query_params['code'])
+                # 用户跳转回来，构造 flow 并使用 code
+                # ⚠️ 再次构造 flow 实例（必须设置相同的 state）
+                flow = Flow.from_client_config(
+                    {
+                        "web": {
+                            "client_id": oauth_secrets["client_id"],
+                            "client_secret": oauth_secrets["client_secret"],
+                            "auth_uri": oauth_secrets["auth_uri"],
+                            "token_uri": oauth_secrets["token_uri"],
+                            "auth_provider_x509_cert_url": oauth_secrets["auth_provider_x509_cert_url"],
+                            "redirect_uris": oauth_secrets["redirect_uris"]
+                        }
+                    },
+                    scopes=SCOPES,
+                    state=st.session_state.get("oauth_state")  # 用保存的 state
+                )
+                flow.redirect_uri = oauth_secrets["redirect_uris"][0]
+
+                # 使用 code 换取 token
+                flow.fetch_token(code=st.query_params["code"])
                 creds = flow.credentials
 
-                # 💾 保存凭证
                 with open(token_path, 'wb') as token:
                     pickle.dump(creds, token)
 
-    # ✅ 构建并返回 Google Sheets API 客户端
     return build('sheets', 'v4', credentials=creds)
+
 def export_to_sheet(email_data_list,spreadsheet_id, sheet_name="シート1"):
     if not email_data_list:
         print("📭 有効なメールデータが見つかりませんでした")
