@@ -391,17 +391,52 @@ def get_sheets_service():
     return build('sheets', 'v4', credentials=creds) if creds else None
 
 def display_google_login():
-    """ログイン状態管理"""
-    if 'oauth_state' not in st.session_state:
-        if st.button("Googleアカウントでログイン"):
-            st.session_state['auth_required'] = True
-            st.rerun()
-    else:
-        st.success("✅ ログイン済み")
-        if st.button("ログアウト"):
-            for service in ['gmail', 'sheets']:
-                token_path = f'/tmp/token_{service}.pickle'
+    """显示登录/登出按钮"""
+    if os.path.exists('/tmp/token_gmail.pickle') and os.path.exists('/tmp/token_sheets.pickle'):
+        st.success("✅ すでにログイン済みです")
+        if st.button("🔓 ログアウト", key="logout_btn"):
+            for service_type in ['gmail', 'sheets']:
+                token_path = f'/tmp/token_{service_type}.pickle'
                 if os.path.exists(token_path):
                     os.unlink(token_path)
-            st.session_state.clear()
             st.rerun()
+    else:
+        st.warning("⚠️ 未認証 - 機能を使用するにはGoogleアカウントでログインしてください")
+        
+        # 准备OAuth流程
+        oauth_secrets = st.secrets["google_oauth"]
+        redirect_uri = oauth_secrets["redirect_uris"][0]
+        
+        # 确保state存在
+        if 'oauth_state' not in st.session_state:
+            st.session_state['oauth_state'] = secrets.token_urlsafe(32)
+        
+        flow = Flow.from_client_config(
+            client_config={
+                "web": {
+                    "client_id": oauth_secrets["client_id"],
+                    "client_secret": oauth_secrets["client_secret"],
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+                    "redirect_uris": [redirect_uri]
+                }
+            },
+            scopes=SCOPES,
+            redirect_uri=redirect_uri,
+            state=st.session_state['oauth_state']
+        )
+        
+        auth_url, _ = flow.authorization_url(
+            prompt='consent',
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+        
+        # 使用st.link_button确保可靠跳转
+        st.link_button(
+            "🔑 Googleでログイン",
+            auth_url,
+            help="Googleアカウントで認証します",
+            type="primary"
+        )
