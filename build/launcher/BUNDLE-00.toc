@@ -1,0 +1,1 @@
+([('launcher', '/Users/mame/ses_extractor/dist/launcher', 'EXECUTABLE')],)
