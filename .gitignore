@@ -18,3 +18,10 @@ venv/
 gemma-2b-transformers/
 
 test/
+.streamlit/
+.DS_Store
+build/
+.ツール/
+*.icns
+config/client_secrets.json
+.streamlit/secrets.toml
