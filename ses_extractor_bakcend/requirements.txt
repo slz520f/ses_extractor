@@ -4,6 +4,7 @@ httpx
 jinja2
 python-multipart
 email-validator
+google-auth-oauthlib
 
 supabase
 PyJWT
