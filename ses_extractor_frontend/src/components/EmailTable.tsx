@@ -15,13 +15,13 @@ import {
   useReactTable,
 } from '@tanstack/react-table'
 import { useState, useEffect, useMemo } from 'react'
-import type { ChangeEvent } from 'react'
+
 import {
   Box,
   Button,
   Flex,
   Input,
-  Select as ChakraSelect,
+
   Skeleton,
   Table,
   Text,
