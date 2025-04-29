@@ -5,6 +5,7 @@ jinja2
 python-multipart
 email-validator
 google-auth-oauthlib
+google-generativeai
 
 supabase
 PyJWT
