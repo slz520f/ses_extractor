@@ -1,7 +1,7 @@
 /*
-  ✅ Chakra UI 替换版
-  - 替换了 Input, Button, Select, Skeleton 等组件
-  - 保留了功能逻辑和表格结构
+  ✅ Chakra UI 置換版
+  - Input、Button、Select、Skeleton などのコンポーネントを置き換えました
+  - 機能ロジックとテーブル構造はそのまま保持
 */
 
 'use client'
@@ -29,8 +29,6 @@ import {
   HStack,
 } from '@chakra-ui/react'
 
-
-
 type Email = {
   received_at: string
   subject: string
@@ -49,8 +47,6 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
   const [selectedSkill, setSelectedSkill] = useState<string[]>(['all'])
   const [filteredEmails, setFilteredEmails] = useState<Email[]>(emails)
   const [loading, setLoading] = useState(true)
-
- 
 
   const handleFilter = useCallback(() => {
     const result = emails.filter((email) => {
@@ -75,7 +71,6 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
         selectedSkill.includes('all') ||
         (Array.isArray(email.required_skills) && email.required_skills.some(skill => selectedSkill.includes(skill))) ||
         (Array.isArray(email.optional_skills) && email.optional_skills.some(skill => selectedSkill.includes(skill)))
-      
 
       return matchesKeyword && matchesLocation && matchesUnitPrice && matchesSkill
     })
@@ -94,20 +89,6 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     setTimeout(() => handleFilter(), 0)
   }
 
-  // const locations = useMemo(() => {
-  //   const locationSet = new Set(emails.map((email) => email.location))
-  //   return Array.from(locationSet)
-  // }, [emails])
-
-  // const skills = useMemo(() => {
-  //   const requiredSkillsSet = new Set(
-  //     emails.flatMap((email) => email.required_skills)
-  //   )
-  //   const optionalSkillsSet = new Set(
-  //     emails.flatMap((email) => email.optional_skills)
-  //   )
-  //   return Array.from(new Set([...requiredSkillsSet, ...optionalSkillsSet]))
-  // }, [emails])
   const skills = [
     'JavaScript',
     'TypeScript',
@@ -125,17 +106,16 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     'Git',
     'Linux',
   ]
-  
 
   const columns: ColumnDef<Email>[] = [
     {
       accessorKey: 'received_at',
-      header: () => '日期',
+      header: () => '日付',
       cell: (row) => new Date(row.getValue() as string).toLocaleString(),
     },
-    { accessorKey: 'subject', header: () => '主题' },
-    { accessorKey: 'sender_email', header: () => '发件人' },
-    { accessorKey: 'project_description', header: () => '案件内容' },
+    { accessorKey: 'subject', header: () => '件名' },
+    { accessorKey: 'sender_email', header: () => '送信者' },
+    { accessorKey: 'project_description', header: () => 'プロジェクト詳細' },
     {
       accessorKey: 'required_skills',
       header: () => '必須スキル',
@@ -167,7 +147,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     <VStack align="stretch" mt={4}>
       <Flex wrap="wrap" gap={4}>
         <Input
-          placeholder="搜索邮件关键词..."
+          placeholder="メールのキーワードを検索..."
           value={globalFilter}
           onChange={(e) => setGlobalFilter(e.target.value)}
           maxW="300px"
@@ -183,11 +163,11 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           _hover={{ bg: "teal.600" }}
           _active={{ bg: "teal.700" }}
         >
-          搜索
+          検索
         </Button>
   
         <Input
-          placeholder="输入地点"
+          placeholder="場所を入力"
           value={selectedLocation}
           onChange={(e) => setSelectedLocation(e.target.value)}
           maxW="200px"
@@ -197,7 +177,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
   
         <HStack>
           <Input
-            placeholder="最低单价"
+            placeholder="最低単価"
             value={unitPriceRange.min}
             onChange={(e) =>
               setUnitPriceRange({ ...unitPriceRange, min: e.target.value })
@@ -207,7 +187,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
             borderColor="teal.300"
           />
           <Input
-            placeholder="最高单价"
+            placeholder="最高単価"
             value={unitPriceRange.max}
             onChange={(e) =>
               setUnitPriceRange({ ...unitPriceRange, max: e.target.value })
@@ -223,7 +203,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           onChange={(e) => setSelectedSkill([e.target.value])}
           className="bg-whiteAlpha.800 border-teal-300 border p-2"
         >
-          <option value="all">全部技能</option>
+          <option value="all">全てのスキル</option>
           {skills.map((skill, i) => (
             <option key={i} value={skill}>
               {skill}
@@ -232,7 +212,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
         </select>
   
         <Button variant="outline" colorScheme="red" onClick={handleReset}>
-          返回所有页面
+          すべてのページに戻る
         </Button>
       </Flex>
   
@@ -252,8 +232,8 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
                     key={header.id}
                     onClick={header.column.getToggleSortingHandler()}
                     cursor="pointer"
-                    className="px-4 py-1 bg-teal-100 hover:bg-teal-200 text-sm" // 设置表头固定宽度
-                    style={{ width: "150px" }} // 固定表头宽度
+                    className="px-4 py-1 bg-teal-100 hover:bg-teal-200 text-sm"
+                    style={{ width: "150px" }}
                   >
                     {flexRender(header.column.columnDef.header, header.getContext())}
                     {header.column.getIsSorted() === 'asc'
@@ -294,31 +274,6 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           </Table.Body>
         </Table.Root>
       </Box>
-  
-      <Flex justify="space-between" align="center">
-        <Button
-          onClick={() => table.previousPage()}
-          disabled={!table.getCanPreviousPage()}
-          variant="outline"
-          colorScheme="blue"
-        >
-          上一页
-        </Button>
-        <Text>
-          页 {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
-        </Text>
-        <Button
-          onClick={() => table.nextPage()}
-          disabled={!table.getCanNextPage()}
-          variant="outline"
-          colorScheme="blue"
-        >
-          下一页
-        </Button>
-      </Flex>
     </VStack>
-  );
-  
-  
-  
+  )
 }
