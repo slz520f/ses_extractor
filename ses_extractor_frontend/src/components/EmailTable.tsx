@@ -47,6 +47,8 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
   const [filteredEmails, setFilteredEmails] = useState<Email[]>(emails)
   const [loading, setLoading] = useState(true)
 
+  
+
   const handleFilter = useCallback(() => {
     const result = emails.filter((email) => {
       const matchesKeyword =
@@ -76,9 +78,11 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
 
     setFilteredEmails(result)
   }, [emails, globalFilter, selectedLocation, unitPriceRange, selectedSkill])
+
   useEffect(() => {
     handleFilter()
   }, [handleFilter])
+  
 
   const handleReset = () => {
     setGlobalFilter('')
@@ -135,6 +139,12 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
+    initialState: {
+      pagination: {
+        pageIndex: 0,
+        pageSize: 30, // ✅ ここで指定
+      },
+    },
   })
 
   useEffect(() => {
@@ -144,6 +154,9 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
 
   return (
     <VStack align="stretch" mt={4}>
+      <Box fontSize="xl" fontWeight="bold" mb={2}>
+        最近14日間のメール（{filteredEmails.length}件）
+      </Box>
       <Flex wrap="wrap" gap={4}>
         <Input
           placeholder="メールのキーワードを検索..."
@@ -218,8 +231,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
       <Box
         borderWidth="1px"
         borderRadius="md"
-        overflowX="hidden"
-        height="500px"
+        overflowX="auto"
         className="rounded-lg shadow-md border border-gray-200 w-full"
       >
         <Table.Root variant="outline" size="sm" tableLayout="auto" className="w-full table-auto">
@@ -273,6 +285,32 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           </Table.Body>
         </Table.Root>
       </Box>
+      <Flex justify="space-between" align="center" mt={4}>
+        <Button
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+          colorScheme="teal"
+          variant="outline"
+          _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
+        >
+          前へ
+        </Button>
+
+        <Box>
+          ページ {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
+        </Box>
+
+        <Button
+          onClick={() => table.nextPage()}
+          disabled={!table.getCanNextPage()}
+          colorScheme="teal"
+          variant="outline"
+          _disabled={{ opacity: 0.5, cursor: 'not-allowed' }}
+        >
+          次へ
+        </Button>
+      </Flex>
+
     </VStack>
   )
 }
