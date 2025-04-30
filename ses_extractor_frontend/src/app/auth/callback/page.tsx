@@ -158,7 +158,7 @@
 import { useEmailAuth } from '@/hooks/useEmailAuth';
 import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails } from '@/services/emailService';
 import { EmailTable } from '@/components/EmailTable';
-import { Progress, useDisclosure } from "@chakra-ui/react";
+import { useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState, useRef } from 'react';
 import {
   Button, CloseButton, Drawer, Portal, DrawerBody, DrawerHeader, DrawerFooter, DrawerContent, DrawerTitle,
@@ -188,9 +188,9 @@ export default function CallbackPage() {
   const [nextFetchTime, setNextFetchTime] = useState<string>('');
   const { toast } = createStandaloneToast();
   const [progress, setProgress] = useState(0);
-  const [progressMessage, setProgressMessage] = useState('');
-  const { onOpen, onClose } = useDisclosure();
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  // const [progressMessage, setProgressMessage] = useState('');
+
+  // const [isModalOpen, setIsModalOpen] = useState(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // 计算下次获取时间
@@ -249,9 +249,9 @@ export default function CallbackPage() {
     if (!accessToken) return;
     
     setIsProcessing(true);
-    setIsModalOpen(true);
+    // setIsModalOpen(true);
     setProgress(0);
-    setProgressMessage('処理を開始しています...');
+    // setProgressMessage('処理を開始しています...');
     
     try {
       const BATCH_SIZE = 20;
@@ -261,7 +261,7 @@ export default function CallbackPage() {
       
       while (processedCount < totalEmails) {
         const batchEnd = Math.min(processedCount + BATCH_SIZE, totalEmails);
-        setProgressMessage(`${processedCount + 1}-${batchEnd}通目を処理中...`);
+        // setProgressMessage(`${processedCount + 1}-${batchEnd}通目を処理中...`);
         
         try {
           const result = await parseAndSaveAllEmails(accessToken);
@@ -276,7 +276,7 @@ export default function CallbackPage() {
           
         } catch (err: unknown) {
           if (err instanceof Error && err.message?.includes('API rate limit')) {
-            setProgressMessage(`API制限に達しました。30秒後に再試行します...`);
+            // setProgressMessage(`API制限に達しました。30秒後に再試行します...`);
             await new Promise(resolve => {
               retryTimeoutRef.current = setTimeout(resolve, 30000);
             });
@@ -308,7 +308,7 @@ export default function CallbackPage() {
       });
     } finally {
       setIsProcessing(false);
-      setIsModalOpen(false);
+      // setIsModalOpen(false);
     }
   };
 
