@@ -62,7 +62,8 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
         )
 
       const matchesLocation =
-        selectedLocation === '' || email.location.toLowerCase().includes(selectedLocation.toLowerCase())
+        (selectedLocation || '') === '' || (email.location || '').toLowerCase().includes((selectedLocation || '').toLowerCase());
+      
 
       const matchesUnitPrice =
         (unitPriceRange.min === '' || parseInt(email.unit_price) >= parseInt(unitPriceRange.min)) &&

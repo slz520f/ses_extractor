@@ -158,7 +158,6 @@
 import { useEmailAuth } from '@/hooks/useEmailAuth';
 import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails } from '@/services/emailService';
 import { EmailTable } from '@/components/EmailTable';
-import { useDisclosure } from "@chakra-ui/react";
 import { useEffect, useState, useRef } from 'react';
 import {
   Button, CloseButton, Drawer, Portal, DrawerBody, DrawerHeader, DrawerFooter, DrawerContent, DrawerTitle,
@@ -187,10 +186,10 @@ export default function CallbackPage() {
   const [parsedEmailCount, setParsedEmailCount] = useState<number | null>(null);
   const [nextFetchTime, setNextFetchTime] = useState<string>('');
   const { toast } = createStandaloneToast();
-  const [progress, setProgress] = useState(0);
-  // const [progressMessage, setProgressMessage] = useState('');
+  
 
-  // const [isModalOpen, setIsModalOpen] = useState(false);
+
+ 
   const retryTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // 计算下次获取时间
@@ -249,9 +248,7 @@ export default function CallbackPage() {
     if (!accessToken) return;
     
     setIsProcessing(true);
-    // setIsModalOpen(true);
-    setProgress(0);
-    // setProgressMessage('処理を開始しています...');
+
     
     try {
       const BATCH_SIZE = 20;
@@ -261,14 +258,14 @@ export default function CallbackPage() {
       
       while (processedCount < totalEmails) {
         const batchEnd = Math.min(processedCount + BATCH_SIZE, totalEmails);
-        // setProgressMessage(`${processedCount + 1}-${batchEnd}通目を処理中...`);
+      
         
         try {
           const result = await parseAndSaveAllEmails(accessToken);
           const parsedCount = result.parsedEmails?.length || 0;
           successCount += parsedCount;
           processedCount = batchEnd;
-          setProgress(Math.floor((processedCount / totalEmails) * 100));
+        
           
           if (result.parsedEmails?.length) {
             setRecentEmails(prev => [...result.parsedEmails, ...prev]);
@@ -276,7 +273,7 @@ export default function CallbackPage() {
           
         } catch (err: unknown) {
           if (err instanceof Error && err.message?.includes('API rate limit')) {
-            // setProgressMessage(`API制限に達しました。30秒後に再試行します...`);
+           
             await new Promise(resolve => {
               retryTimeoutRef.current = setTimeout(resolve, 30000);
             });
