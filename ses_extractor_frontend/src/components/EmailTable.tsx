@@ -14,7 +14,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { useState, useEffect} from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 import {
   Box,
@@ -50,11 +50,9 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
   const [filteredEmails, setFilteredEmails] = useState<Email[]>(emails)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    handleFilter()
-  }, [emails])
+ 
 
-  const handleFilter = () => {
+  const handleFilter = useCallback(() => {
     const result = emails.filter((email) => {
       const matchesKeyword =
         globalFilter === '' ||
@@ -83,7 +81,10 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     })
 
     setFilteredEmails(result)
-  }
+  }, [emails, globalFilter, selectedLocation, unitPriceRange, selectedSkill])
+  useEffect(() => {
+    handleFilter()
+  }, [handleFilter])
 
   const handleReset = () => {
     setGlobalFilter('')
