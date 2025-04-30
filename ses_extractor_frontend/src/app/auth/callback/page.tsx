@@ -213,26 +213,11 @@ export default function CallbackPage() {
 
   const handleFetchEmails = async () => {
     if (!accessToken) return;
-    try {
-      const result = await fetchEmails(accessToken);
-      const count = result.messages?.length || 0;
-      setFetchedEmailCount(count);
-      toast({
-        title: 'メール取得完了',
-        description: `${count}通の新しいメールが見つかりました`,
-        status: 'success',
-        duration: 3000,
-        isClosable: true,
-      });
-    } catch  {
-      toast({
-        title: 'エラー',
-        description: 'メールの取得に失敗しました',
-        status: 'error',
-        duration: 3000,
-        isClosable: true,
-      });
-    }
+
+    const result = await fetchEmails(accessToken);
+    const count = result.emails?.length || 0;
+    setFetchedEmailCount(count);  // 👈 更新数量
+
   };
 
   // 清除重试定时器

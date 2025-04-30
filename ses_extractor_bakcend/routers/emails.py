@@ -1,34 +1,22 @@
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
-from fastapi import FastAPI
-import requests
+
+
 import os
-import re
 import logging
-import google.generativeai as genai
-import json
-import base64
-from typing import Dict, Any
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
 from routers.auth import token_store
-from supabase import create_client  # 导入 supabase 客户端
-from typing import List, Dict, Any  # Ensure List is imported
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
 from supabase import create_client, Client
-import time
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.interval import IntervalTrigger
-import atexit
-from contextlib import asynccontextmanager
-from email_utils import fetch_ses_emails, refresh_access_token
-from gemini_parser import parse_emails_with_gemini, send_to_api
+
+from utils.emails import fetch_ses_emails, refresh_access_token
+from utils.gemini_and_db import parse_emails_with_gemini, send_to_api
+
 
 
 # 初始化
 router = APIRouter()
-app = FastAPI()
+
 load_dotenv()
 
 # 配置
@@ -46,55 +34,15 @@ supabase: Client = create_client(
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# 初始化定时任务调度器
-scheduler = BackgroundScheduler(daemon=True)
-scheduler.start()
-atexit.register(lambda: scheduler.shutdown())  # 确保应用退出时关闭调度器
-
-# def scheduled_email_fetching(access_token: str = None):
-#     """
-#     执行邮件获取、解析和保存的完整流程
-#     """
-#     if not access_token:
-#         access_token = token_store.get("access_token")
-#         if not access_token:
-#             logger.warning("未登录或Token已失效，跳过邮件获取")
-#             raise ValueError("未登录或Token已失效")
-
-#     try:
-#         logger.info("⏰ 开始获取邮件...")
-        
-#         # 1. 获取邮件
-#         ses_emails = fetch_ses_emails(access_token)
-#         logger.info(f"📨 获取到 {len(ses_emails)} 封新邮件")
-        
-#         if not ses_emails:
-#             logger.info("没有新邮件需要处理")
-#             return {"status": "success", "message": "没有新邮件"}
-        
-#         # 2. 使用Gemini解析
-#         email_data_list = parse_emails_with_gemini(ses_emails)
-#         logger.info(f"🔍 成功解析 {len(email_data_list)} 封邮件")
-        
-#         # 3. 保存到数据库
-#         send_to_api(email_data_list)
-#         logger.info("💾 邮件数据已保存到数据库")
-        
-#         return {"status": "success", "processed": len(email_data_list)}
-        
-#     except Exception as e:
-#         logger.error(f"邮件处理失败: {str(e)}")
-#         raise
-
 
 
 # def get_recent_emails():
 #     """
-#     获取近14天的邮件数据
+#     获取近5天的邮件数据
 #     :return: 返回邮件列表
 #     """
 #     # 获取当前时间和5天前的时间
-#     five_days_ago = (datetime.utcnow() - timedelta(days=14)).isoformat()
+#     five_days_ago = (datetime.utcnow() - timedelta(days=5)).isoformat()
 
 #     # 查询 ses_projects 表，筛选出接收时间在近5天内的记录
 #     response = supabase.table('ses_projects') \
@@ -170,114 +118,17 @@ atexit.register(lambda: scheduler.shutdown())  # 确保应用退出时关闭调�
 #         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
 
-# # def get_today_date_query():
-# #     """当日限定の検索クエリを作成する関数"""
-# #     today = datetime.now()
-# #     tomorrow = today + timedelta(days=1)
-
-# #     after_str = today.strftime('%Y/%m/%d')
-# #     before_str = tomorrow.strftime('%Y/%m/%d')
-
-# #     return f'after:{after_str} before:{before_str}'    
 # def get_today_date_query():
-#     today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-#     return f" after:{int(time.mktime(today.timetuple()))}"
+#     """当日限定の検索クエリを作成する関数"""
+#     today = datetime.now()
+#     tomorrow = today + timedelta(days=1)
 
+#     after_str = today.strftime('%Y/%m/%d')
+#     before_str = tomorrow.strftime('%Y/%m/%d')
 
-# # 新增函数：获取或更新最后获取时间
-# def get_last_fetch_time():
-#     result = supabase.table('email_fetch_status').select('*').order('last_fetch_time', desc=True).limit(1).execute()
-#     if result.data:
-#         return datetime.fromisoformat(result.data[0]['last_fetch_time'])
-#     return None
+#     return f'after:{after_str} before:{before_str}'    
 
-# def update_last_fetch_time(new_time, last_message_id=None):
-#     supabase.table('email_fetch_status').insert({
-#         'last_fetch_time': new_time,
-#         'last_message_id': last_message_id
-#     }).execute()    
-
-
-
-# def has_attachments(msg):
-#     """判断邮件是否包含附件"""
-#     parts = msg.get('payload', {}).get('parts', [])
-#     for part in parts:
-#         if part.get('filename'):
-#             return True
-#         if part.get('body', {}).get('attachmentId'):
-#             return True
-#     return False
-
-# def fetch_ses_emails(access_token: str, progress_bar=None, query="in:inbox"):
-#     """增量获取 SES 案件邮件（无附件）"""
-#     last_fetch = get_last_fetch_time()
-    
-#     if last_fetch:
-#         # 使用 Unix timestamp 格式以提高 Gmail 查询的兼容性
-#         date_query = f" after:{int(last_fetch.timestamp())}"
-#     else:
-#         # 如果是第一次获取，则查询当天的邮件
-#         date_query = get_today_date_query()  # e.g. " after:2025/04/30"
-
-#     full_query = f"{query}{date_query}"
-#     print(f"执行查询: {full_query}")
-
-#     credentials = Credentials(token=access_token)
-#     service = build('gmail', 'v1', credentials=credentials)
-
-#     # 分批获取邮件
-#     messages = []
-#     page_token = None
-#     batch_size = 200
-
-#     while True:
-#         results = service.users().messages().list(
-#             userId='me',
-#             q=full_query,
-#             maxResults=batch_size,
-#             pageToken=page_token
-#         ).execute()
-
-#         batch = results.get('messages', [])
-#         messages.extend(batch)
-
-#         # 更新"最后获取时间"
-#         if batch:
-#             newest_msg = service.users().messages().get(
-#                 userId='me',
-#                 id=batch[0]['id'],
-#                 format='metadata'
-#             ).execute()
-
-#             timestamp_ms = int(newest_msg.get("internalDate", "0"))
-#             msg_date = datetime.fromtimestamp(timestamp_ms / 1000)
-#             if msg_date:
-
-#                 update_last_fetch_time(format_datetime(str(msg_date)), batch[0]['id'])
-
-#         page_token = results.get('nextPageToken')
-#         if not page_token or len(messages) >= batch_size:
-#             break
-
-#     # 过滤掉有附件的邮件
-#     ses_emails = []
-#     for msg_meta in messages:
-#         msg = service.users().messages().get(
-#             userId='me',
-#             id=msg_meta['id'],
-#             format='full'
-#         ).execute()
-
-#         if not has_attachments(msg):
-#             ses_emails.append(msg)
-#             if progress_bar:
-#                 progress_bar.update(1)
-
-#     return ses_emails
-
-#原来的能用的找邮件
-# def fetch_ses_emails(access_token: str, progress_bar=None,query="(案件） has:nouserlabels "):
+# def fetch_ses_emails(access_token: str, progress_bar=None,query="(案件 OR SE OR 求人   ) has:nouserlabels "):
 #     """当日受信したSES案件メール（添付ファイルなし）を取得"""
 #     date_query = get_today_date_query()
 #     full_query = f" {query}{date_query}"
@@ -323,8 +174,6 @@ atexit.register(lambda: scheduler.shutdown())  # 确保应用退出时关闭调�
 #             ses_emails.append(msg)
     
 #     return ses_emails
-
-
 
 # class GeminiParser:
 #     def __init__(self, model_name: str = "gemini-1.5-flash-latest"):
@@ -374,6 +223,7 @@ atexit.register(lambda: scheduler.shutdown())  # 确保应用退出时关闭调�
         
 #         json_str = json_match.group(0)
         
+
 #         try:
 #             parsed = json.loads(json_str)
 #             required_fields = ["案件内容", "必須スキル", "勤務地", "単価"]
