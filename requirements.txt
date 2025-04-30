@@ -1,13 +1,24 @@
-streamlit
-pandas
-openpyxl
-google-api-python-client
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-httplib2
-google-generativeai
-mysql-connector-python
-python-dotenv
-Levenshtein
+# streamlit
+# pandas
+# openpyxl
+# google-api-python-client
+# google-auth
+# google-auth-oauthlib
+# google-auth-httplib2
+# httplib2
+# google-generativeai
+# mysql-connector-python
+# python-dotenv
+# Levenshtein
+# schedule
+
+fastapi
+uvicorn[standard]
+httpx
+jinja2
+python-multipart
+email-validator
+
+supabase
+PyJWT
 schedule

@@ -93,10 +93,10 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     setTimeout(() => handleFilter(), 0)
   }
 
-  const locations = useMemo(() => {
-    const locationSet = new Set(emails.map((email) => email.location))
-    return Array.from(locationSet)
-  }, [emails])
+  // const locations = useMemo(() => {
+  //   const locationSet = new Set(emails.map((email) => email.location))
+  //   return Array.from(locationSet)
+  // }, [emails])
 
   // const skills = useMemo(() => {
   //   const requiredSkillsSet = new Set(

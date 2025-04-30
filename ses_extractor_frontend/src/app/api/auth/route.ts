@@ -10,7 +10,7 @@ const SCOPES = [
 ];
 
 // 处理GET请求
-export async function GET(req: NextRequest) {
+export async function GET() {
   const state = Math.random().toString(36).substring(7); // 生成一个随机state防止CSRF攻击
   const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
 

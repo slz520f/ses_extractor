@@ -1,10 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function HomePage() {
-  const router = useRouter();
   const [loading, setLoading] = useState(false); // 登录按钮的加载状态
   const [error, setError] = useState<string | null>(null);
 

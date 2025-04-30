@@ -14,7 +14,6 @@ export default function CallbackPage() {
   const [parsedEmails, setParsedEmails] = useState<any[]>([]);
   const [recentEmails, setRecentEmails] = useState<any[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<any>(null);
   const [fetchedEmailCount, setFetchedEmailCount] = useState<number | null>(null);
   const [parsedEmailCount, setParsedEmailCount] = useState<number | null>(null);

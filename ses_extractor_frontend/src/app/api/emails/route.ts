@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   try {
     // 调用后端的FastAPI接口
     const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/emails/fetch`, {
