@@ -21,8 +21,8 @@ interface Email {
 
 export default function CallbackPage() {
   const { loading, error, userEmail, accessToken } = useEmailAuth();
-  const [emails, setEmails] = useState<Email[]>([]);
-  const [parsedEmails, setParsedEmails] = useState<Email[]>([]);
+  // const [emails, setEmails] = useState<Email[]>([]);
+  // const [parsedEmails, setParsedEmails] = useState<Email[]>([]);
   const [recentEmails, setRecentEmails] = useState<Email[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);  
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
@@ -34,7 +34,7 @@ export default function CallbackPage() {
     if (!accessToken) return;
     const result = await fetchEmails(accessToken);
     const count = result.messages?.length || 0;
-    setEmails(result.messages || []);
+    // setEmails(result.messages || []);
     setFetchedEmailCount(count);  // 👈 更新数量
   };
 
@@ -43,7 +43,7 @@ export default function CallbackPage() {
     setIsProcessing(true);
     const result = await parseAndSaveAllEmails(accessToken);
     const parsedCount = result.parsedEmails?.length || 0;
-    setParsedEmails(result.parsedEmails || []);
+    // setParsedEmails(result.parsedEmails || []);
     setParsedEmailCount(parsedCount);  // 👈 更新数量
     
     // 重新加载解析后的 recentEmails
@@ -54,7 +54,7 @@ export default function CallbackPage() {
   // ref for programmatically opening drawer
   const drawerTriggerRef = useRef<HTMLButtonElement>(null);
 
-  const handleEmailClick = (email: any) => {
+  const handleEmailClick = (email: Email) => {
     setSelectedEmail(email);
     drawerTriggerRef.current?.click(); // simulate click to open drawer
   };
