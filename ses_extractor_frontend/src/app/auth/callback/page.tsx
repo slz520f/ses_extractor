@@ -3,18 +3,29 @@
 import { useEmailAuth } from '@/hooks/useEmailAuth';
 import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails } from '@/services/emailService';
 import {EmailTable} from '@/components/EmailTable';
-import { useEffect, useState } from 'react';
-import {Button,CloseButton,Drawer,Portal,DrawerBody,DrawerHeader,DrawerFooter,DrawerContent,DrawerTitle,DrawerBackdrop,DrawerPositioner,DrawerTrigger,DrawerCloseTrigger,DrawerActionTrigger,} from "@chakra-ui/react";
-import { useRef } from "react";
+import { useEffect, useState, useRef } from 'react';
+
+import {Button,CloseButton,Drawer,Portal,DrawerBody,DrawerHeader,DrawerFooter,DrawerContent,DrawerTitle,DrawerBackdrop,DrawerPositioner,DrawerCloseTrigger,DrawerActionTrigger,} from "@chakra-ui/react";
+interface Email {
+  sender_email: string;
+  subject: string;
+  received_at: string;
+  project_description: string;
+  required_skills: string[];
+  optional_skills: string[];
+  location: string;
+  unit_price: string;
+}
+
 
 
 export default function CallbackPage() {
   const { loading, error, userEmail, accessToken } = useEmailAuth();
-  const [emails, setEmails] = useState<any[]>([]);
-  const [parsedEmails, setParsedEmails] = useState<any[]>([]);
-  const [recentEmails, setRecentEmails] = useState<any[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [selectedEmail, setSelectedEmail] = useState<any>(null);
+  const [emails, setEmails] = useState<Email[]>([]);
+  const [parsedEmails, setParsedEmails] = useState<Email[]>([]);
+  const [recentEmails, setRecentEmails] = useState<Email[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);  
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const [fetchedEmailCount, setFetchedEmailCount] = useState<number | null>(null);
   const [parsedEmailCount, setParsedEmailCount] = useState<number | null>(null);
 
@@ -122,8 +133,8 @@ export default function CallbackPage() {
                       <strong>案件内容：</strong>
                       <p>{selectedEmail.project_description}</p>
                     </div>
-                    <p><strong>必須スキル：</strong>{selectedEmail.required_skills}</p>
-                    <p><strong>尚可スキル：</strong>{selectedEmail.optional_skills}</p>
+                    <p><strong>必須スキル：</strong>{selectedEmail.required_skills.join(', ')}</p>
+                    <p><strong>尚可スキル：</strong>{selectedEmail.optional_skills.join(', ')}</p>
                     <p><strong>勤務地：</strong>{selectedEmail.location}</p>
                     <p><strong>単価：</strong>{selectedEmail.unit_price}</p>
                   </div>

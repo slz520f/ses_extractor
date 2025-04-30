@@ -14,7 +14,7 @@ import {
   getSortedRowModel,
   useReactTable,
 } from '@tanstack/react-table'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect} from 'react'
 
 import {
   Box,
