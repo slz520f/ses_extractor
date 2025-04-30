@@ -78,11 +78,11 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     })
 
     setFilteredEmails(result)
-  }, [emails, globalFilter, selectedLocation, unitPriceRange, selectedSkill])
+  }, [ globalFilter, selectedLocation, unitPriceRange, selectedSkill])
 
-  useEffect(() => {
-    handleFilter()
-  }, [handleFilter])
+  // useEffect(() => {
+  //   handleFilter()
+  // }, [handleFilter])
   
 
   const handleReset = () => {

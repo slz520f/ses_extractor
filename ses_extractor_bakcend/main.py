@@ -14,7 +14,7 @@ print(f"SUPABASE_KEY: {os.getenv('SUPABASE_KEY')}")
 # 允许前端访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js端口
+    allow_origins=["http://localhost:3000","https://ses-extractor-1.onrender.com"],  # Next.js端口
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

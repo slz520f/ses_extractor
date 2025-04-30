@@ -224,7 +224,7 @@ export default function CallbackPage() {
         duration: 3000,
         isClosable: true,
       });
-    } catch (err) {
+    } catch  {
       toast({
         title: 'エラー',
         description: 'メールの取得に失敗しました',
