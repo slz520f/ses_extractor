@@ -24,7 +24,6 @@ import {
 
   Skeleton,
   Table,
-  Text,
   VStack,
   HStack,
 } from '@chakra-ui/react'
