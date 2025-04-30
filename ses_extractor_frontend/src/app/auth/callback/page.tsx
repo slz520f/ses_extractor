@@ -125,8 +125,9 @@ export default function CallbackPage() {
                       <strong>案件内容：</strong>
                       <p>{selectedEmail.project_description}</p>
                     </div>
-                    <p><strong>必須スキル：</strong>{selectedEmail.required_skills.join(', ')}</p>
-                    <p><strong>尚可スキル：</strong>{selectedEmail.optional_skills.join(', ')}</p>
+                    <p><strong>必須スキル：</strong>{Array.isArray(selectedEmail.required_skills) ? selectedEmail.required_skills.join(', ') : '-'}</p>
+                    <p><strong>尚可スキル：</strong>{Array.isArray(selectedEmail.optional_skills) ? selectedEmail.optional_skills.join(', ') : '-'}</p>
+
                     <p><strong>勤務地：</strong>{selectedEmail.location}</p>
                     <p><strong>単価：</strong>{selectedEmail.unit_price}</p>
                   </div>
