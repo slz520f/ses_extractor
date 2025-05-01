@@ -10,6 +10,7 @@ from google.oauth2 import id_token
 
 
 
+
 load_dotenv()
 
 router = APIRouter()
@@ -24,6 +25,7 @@ SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "openid",
 ]
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL")
 
 # 测试用Token存储（后面可以换成DB或Supabase）
 token_store = {}
@@ -99,7 +101,8 @@ async def auth_callback(request: Request):
         token_store["user_email"] = user_email
 
         # ✅ 登录成功后，重定向到前端主页并附带必要的信息
-        frontend_home_url = "http://localhost:3000/auth/callback"  # 前端主页的 URL
+        # frontend_home_url = "http://localhost:3000/auth/callback" 
+        frontend_home_url = "https://ses-extractor-1.onrender.com"
         return RedirectResponse(url=f"{frontend_home_url}/?email={user_email}&access_token={credentials.token}")
 
     except Exception as e:

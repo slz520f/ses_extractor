@@ -162,7 +162,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   Button, CloseButton, Drawer, Portal, DrawerBody, DrawerHeader, DrawerFooter, DrawerContent, DrawerTitle,
   DrawerBackdrop, DrawerPositioner, DrawerCloseTrigger, DrawerActionTrigger,
-  Box, Text, Flex
+  Box, Text, Flex,ProgressRoot,ProgressTrack,ProgressRange
 } from "@chakra-ui/react";
 import { createStandaloneToast } from '@chakra-ui/toast';
 
@@ -186,6 +186,9 @@ export default function CallbackPage() {
   const [parsedEmailCount, setParsedEmailCount] = useState<number | null>(null);
   const [nextFetchTime, setNextFetchTime] = useState<string>('');
   const { toast } = createStandaloneToast();
+  const [previousFetchedEmailCount, setPreviousFetchedEmailCount] = useState<number | null>(null);
+  const [fetchProgress, setFetchProgress] = useState(0); // 新增：记录找邮件的进度
+  const [parseProgress, setParseProgress] = useState(0); // 新增：记录解析邮件的进度
   
 
 
@@ -215,10 +218,20 @@ export default function CallbackPage() {
     if (!accessToken) return;
 
     const result = await fetchEmails(accessToken);
-    const count = result.emails?.length || 0;
-    setFetchedEmailCount(count);  // 👈 更新数量
+  const newFetchedCount = result.emails?.length || 0;
 
-  };
+  // 如果有之前获取过邮件的数量，计算新邮件数量
+  if (previousFetchedEmailCount !== null) {
+    const newEmailsCount = newFetchedCount - previousFetchedEmailCount;
+    setFetchedEmailCount(newEmailsCount >= 0 ? newEmailsCount : 0); // 显示新邮件数量
+  } else {
+    setFetchedEmailCount(newFetchedCount);  // 第一次获取，直接显示所有邮件数量
+  }
+
+  // 更新上次获取邮件的数量
+  setPreviousFetchedEmailCount(newFetchedCount);
+  setFetchProgress(100); // 设置为100表示邮件找完了
+};
 
   // 清除重试定时器
   useEffect(() => {
@@ -233,6 +246,7 @@ export default function CallbackPage() {
     if (!accessToken) return;
     
     setIsProcessing(true);
+    setParseProgress(0); // 重置进度条
 
     
     try {
@@ -250,8 +264,11 @@ export default function CallbackPage() {
           const parsedCount = result.parsedEmails?.length || 0;
           successCount += parsedCount;
           processedCount = batchEnd;
+
+          // 更新进度条
+          const progress = Math.floor((processedCount / totalEmails) * 100);
+          setParseProgress(progress);
         
-          
           if (result.parsedEmails?.length) {
             setRecentEmails(prev => [...result.parsedEmails, ...prev]);
           }
@@ -278,6 +295,8 @@ export default function CallbackPage() {
         duration: 3000,
         isClosable: true,
       });
+      // 解析完成后重新加载邮件列表
+      await loadRecentEmails();
       
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'メールの解析に失敗しました';
@@ -292,6 +311,12 @@ export default function CallbackPage() {
       setIsProcessing(false);
       // setIsModalOpen(false);
     }
+  };
+  // 加载最新邮件
+  const loadRecentEmails = async () => {
+    if (!accessToken) return;
+    const result = await fetchRecentEmails(accessToken);
+    setRecentEmails(result.emails || []);
   };
 
   // 手动立即触发
@@ -355,14 +380,45 @@ export default function CallbackPage() {
         >
           {isProcessing ? '処理中...' : 'すべてのメールを解析して保存'}
         </button>
+        {/* 进度条 */}
+        <div className="mt-4">
+        {fetchProgress < 100 && (
+          <div className="mb-4">
+            <Text>メール取得進捗: {fetchProgress}%</Text>
+            <ProgressRoot maxW="240px">
+              <ProgressTrack>
+                <ProgressRange style={{ width: `${fetchProgress}%` }} />
+              </ProgressTrack>
+            </ProgressRoot>
+          </div>  
+        )}
+
+        {parseProgress < 100 && (
+          <div className="mb-4">
+            <Text>解析進捗: {parseProgress}%</Text>
+            <ProgressRoot maxW="240px">
+              <ProgressTrack>
+                <ProgressRange style={{ width: `${parseProgress}%` }} />
+              </ProgressTrack>
+            </ProgressRoot>
+          </div>
+        )}
+
+        </div>
+
+
         <div className="mt-2 text-sm text-gray-700 space-y-1">
-          {fetchedEmailCount !== null && (
-            <p>{fetchedEmailCount} 通のメールが見つかりました</p>
+          {fetchedEmailCount !== null && fetchedEmailCount > 0 && (
+            <p>{fetchedEmailCount} 通の新しいメールが見つかりました</p>
+          )}
+          {fetchedEmailCount !== null && fetchedEmailCount === 0 && (
+            <p>新しいメールはありません</p>
           )}
           {parsedEmailCount !== null && (
             <p>{parsedEmailCount} 通のメールを正常に解析して保存しました</p>
           )}
         </div>
+
       </div>
 
       <div className="w-full">
