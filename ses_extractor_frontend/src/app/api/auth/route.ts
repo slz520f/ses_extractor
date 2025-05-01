@@ -1,5 +1,5 @@
+//ses_extractor_frontend/src/app/api/auth/route.ts
 import {  NextResponse } from 'next/server';
-
 // 你的 Google OAuth2 的设置
 const CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
 const REDIRECT_URI = process.env.NEXT_PUBLIC_GOOGLE_REDIRECT_URI!; // 登录成功后返回的地址
