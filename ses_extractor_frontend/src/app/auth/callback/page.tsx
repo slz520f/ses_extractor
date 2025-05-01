@@ -10,7 +10,7 @@ import { useEffect, useState, useRef } from 'react';
 import {
   Button, CloseButton, Drawer, Portal, DrawerBody, DrawerHeader, DrawerFooter, DrawerContent, DrawerTitle,
   DrawerBackdrop, DrawerPositioner, DrawerCloseTrigger, DrawerActionTrigger,
-  Box, Text, Flex,ProgressRoot,ProgressTrack,ProgressRange
+  
 } from "@chakra-ui/react";
 import { createStandaloneToast } from '@chakra-ui/toast';
 import ApiKeyInput from '@/components/ApiKeyInput';
