@@ -10,7 +10,7 @@ export default function HomePage() {
     setLoading(true);
     try {
       // const response = await fetch('http://localhost:8000/auth/login', {
-      const response = await fetch('hhttps://ses-extractor.onrender.com/auth/login', {
+      const response = await fetch('https://ses-extractor.onrender.com/auth/login', {
         method: 'GET',
       });
 
