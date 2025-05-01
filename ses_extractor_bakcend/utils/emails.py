@@ -86,7 +86,7 @@ def fetch_ses_emails(access_token: str, query="(案件 OR SE OR 求人) has:nous
     service = build('gmail', 'v1', credentials=credentials)
     
     print(f"实用查询: {full_query}")
-    results = service.users().messages().list(userId='me', q=full_query, maxResults=2000).execute()
+    results = service.users().messages().list(userId='me', q=full_query, maxResults=200).execute()
     
     messages = results.get('messages', [])
     ses_emails = []
