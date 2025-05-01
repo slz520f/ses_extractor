@@ -102,7 +102,7 @@ async def auth_callback(request: Request):
 
         # ✅ 登录成功后，重定向到前端主页并附带必要的信息
         # frontend_home_url = "http://localhost:3000/auth/callback" 
-        frontend_home_url = "https://ses-extractor-1.onrender.com"
+        frontend_home_url = "https://ses-extractor-1.onrender.com/auth/callback"
         return RedirectResponse(url=f"{frontend_home_url}/?email={user_email}&access_token={credentials.token}")
 
     except Exception as e:
