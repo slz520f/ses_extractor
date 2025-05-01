@@ -22,13 +22,19 @@ supabase: Client = create_client(
 )
 
 class GeminiParser:
-    def __init__(self, model_name: str = "gemini-1.5-flash-latest"):
+    def __init__(self, model_name: str = "gemini-1.5-flash-latest", api_key: str = None):
         """
         Google Generative AI (Gemini) モデルの初期化
-        
+
         Args:
             model_name (str): モデル名
+            api_key (str): 明示的に渡された API キー（オプション）
         """
+        if api_key:
+            genai.configure(api_key=api_key)
+            logger.info("✅ GeminiParser 内で API キーを構成しました。")
+        else:
+            logger.warning("⚠️ GeminiParser に API キーが渡されませんでした。環境変数が使用されます。")
         logger.info(f"Using Gemini model: {model_name}")
         self.model = genai.GenerativeModel(model_name)
 
@@ -120,69 +126,6 @@ class GeminiParser:
         }
 
 
-#可以用的老版本，没有增量
-# def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key=None) -> List[Dict]:
-#     import google.generativeai as genai
-
-#     # APIキーの構成（引数優先、なければ環境変数）
-#     if api_key:
-#         genai.configure(api_key=api_key)
-#         logger.info("✅ 明示された API キーで Gemini を構成しました。")
-#     else:
-#         env_key = os.getenv("GOOGLE_API_KEY")
-#         if env_key:
-#             genai.configure(api_key=env_key)
-#             logger.info("✅ 環境変数から API キーを読み取りました。")
-#         else:
-#             logger.error("❌ Gemini APIキーが見つかりません。")
-#             raise ValueError("Gemini APIキーが必要です。")
-
-#     parser = GeminiParser()  # パーサーにも渡す
-#     email_data_list = []
-
-#     for i, email in enumerate(emails, 1):
-#         if progress_callback:
-#             progress_callback(i / len(emails))
-
-#         logging.info(f"\n--- メール {i}/{len(emails)} を処理中 ---")
-        
-#         subject = extract_headers(email, 'Subject')
-#         sender = extract_headers(email, 'From')
-#         date = format_datetime(extract_headers(email, 'Date'))
-#         body_text = extract_body(email)
-
-#         logging.info(f"件名: {subject}")
-#         logging.info(f"送信者: {sender}")
-#         logging.info(f"日付: {date}")
-
-#         if not body_text.strip():
-#             logging.warning("⚠️ 本文が空です。スキップします。")
-#             continue
-
-#         try:
-#             parsed = parser.parse_email(body_text)
-#             logging.info("解析結果:")
-#             logging.info(json.dumps(parsed, indent=2, ensure_ascii=False))
-
-#             email_data = {
-#                 'received_at': date,
-#                 'subject': subject,
-#                 'sender_email': sender,
-#                 'project_description': parsed.get('案件内容', ''),
-#                 'required_skills': parsed.get('必須スキル', []),
-#                 'optional_skills': parsed.get('尚可スキル', []),
-#                 "location": parsed.get("勤務地", ""),
-#                 "unit_price": parsed.get("単価", ""),
-#                 'message_id': email.get('id')
-#             }
-
-#             email_data_list.append(email_data)
-
-#         except Exception as e:
-#             logging.error(f"❌ メールの処理中にエラーが発生しました: {str(e)}")
-
-#     return email_data_list
-
 
 #有增量的parse_emails_with_gemini
 def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key=None) -> List[Dict]:
@@ -197,12 +140,13 @@ def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key
         if env_key:
             genai.configure(api_key=env_key)
             logger.info("✅ 環境変数から API キーを読み取りました。")
+            api_key = env_key  # パーサーにも渡すため
         else:
             logger.error("❌ Gemini APIキーが見つかりません。")
             raise ValueError("Gemini APIキーが必要です。")
 
 
-    parser = GeminiParser()  # パーサーにも渡す
+    parser = GeminiParser(api_key=api_key)  # パーサーにも渡す
     email_data_list = []
 
 

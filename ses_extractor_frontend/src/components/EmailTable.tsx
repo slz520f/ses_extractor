@@ -80,9 +80,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     setFilteredEmails(result)
   }, [ globalFilter, selectedLocation, unitPriceRange, selectedSkill])
 
-  // useEffect(() => {
-  //   handleFilter()
-  // }, [handleFilter])
+
   
 
   const handleReset = () => {
@@ -169,16 +167,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           _hover={{ borderColor: "teal.500" }}
           _focus={{ borderColor: "teal.600" }}
         />
-        <Button
-          colorScheme="teal"
-          onClick={handleFilter}
-          bg="teal.500"
-          _hover={{ bg: "teal.600" }}
-          _active={{ bg: "teal.700" }}
-        >
-          検索
-        </Button>
-  
+        
         <Input
           placeholder="場所を入力"
           value={selectedLocation}
@@ -188,7 +177,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           borderColor="teal.300"
         />
   
-        <HStack>
+        <HStack >
           <Input
             placeholder="最低単価"
             value={unitPriceRange.min}
@@ -214,7 +203,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
         <select
           value={selectedSkill[0]}
           onChange={(e) => setSelectedSkill([e.target.value])}
-          className="bg-whiteAlpha.800 border-teal-300 border p-2"
+          className="bg-whiteAlpha.800 border-teal-300 border p-2 max-w-[200px]"
         >
           <option value="all">全てのスキル</option>
           {skills.map((skill, i) => (
@@ -224,11 +213,32 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           ))}
         </select>
   
-        <Button variant="outline" colorScheme="red" onClick={handleReset}>
+        <Button
+          colorScheme="teal"
+          onClick={handleFilter}
+          bg="teal.500"
+          _hover={{ bg: "teal.600" }}
+          _active={{ bg: "teal.700" }}
+          width="auto"
+          height="44px"
+        >
+          検索
+        </Button>
+    
+        <Button
+          variant="outline"
+          colorScheme="teal"
+          bg="teal.500"
+          _hover={{ bg: "teal.600" }}
+          _active={{ bg: "teal.700" }}
+          onClick={handleReset}
+          width="auto"
+          height="44px"
+        >
           すべてのページに戻る
         </Button>
       </Flex>
-  
+    
       <Box
         borderWidth="1px"
         borderRadius="md"
@@ -296,11 +306,11 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
         >
           前へ
         </Button>
-
+  
         <Box>
           ページ {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
         </Box>
-
+  
         <Button
           onClick={() => table.nextPage()}
           disabled={!table.getCanNextPage()}
@@ -311,7 +321,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
           次へ
         </Button>
       </Flex>
-
     </VStack>
   )
+  
 }

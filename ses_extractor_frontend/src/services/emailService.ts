@@ -95,9 +95,15 @@ export const fetchRecentEmails = async (accessToken: string) => {
 };
 
 // 解析并保存所有邮件
+
 export const parseAndSaveAllEmails = async (accessToken: string) => {
+  let apiKey: string | null = null;
+  if (typeof window !== 'undefined') {
+    apiKey = localStorage.getItem('gemini_api_key');
+  }
   const response = await fetch(`${API_BASE_URL}/emails/parse_and_save_all_emails`, {
     method: 'POST',
+    body: JSON.stringify({ apiKey }),
     headers: { 
       Authorization: `Bearer ${accessToken}`, 
       'Content-Type': 'application/json' 

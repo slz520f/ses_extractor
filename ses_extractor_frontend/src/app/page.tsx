@@ -9,7 +9,8 @@ export default function HomePage() {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/auth/login', {
+      // const response = await fetch('http://localhost:8000/auth/login', {
+      const response = await fetch('hhttps://ses-extractor.onrender.com/auth/login', {
         method: 'GET',
       });
 
