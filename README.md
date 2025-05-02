@@ -1,188 +1,98 @@
-# ses_extractor
-# SES案件マネジメントシステム
-#エンジニア向け
-    ## 🚀 概要
-    GmailのSES案件メールを自動処理し、検索可能なデータベース化するシステム。AIによる情報抽出とGoogleスプレッドシート連携機能を備える。
+🧩 使用技術
+フロントエンド：Next.js（App Router）+ TypeScript + Chakra UI
 
-    ## ✅ 動作環境
-    - Python 3.10+
-    - MySQL 8.0+
-    - Google Cloud Platformアカウント
+バックエンド：FastAPI
 
-    ## ⚙️ セットアップ手順
-    1. Visual Studio Code インストール
-    Windows:
+データベース：Supabase（PostgreSQL）
 
-    - [VS Code公式サイト](https://code.visualstudio.com/) にアクセス 
-    「Download for Windows」ボタンをクリック
-    ダウンロードした VSCodeUserSetup-x64-*.exe をダブルクリック
-    インストールオプション：
-    「PATHへの追加」にチェック ✓
-    「ファイルコンテキストメニューに開くを追加」にチェック ✓
+タスクスケジューラー：APScheduler
 
-    Mac:
+認証：Google OAuth 2.0
 
-    \```bash
-    # Homebrew経由でインストール（推奨）
-    brew install --cask visual-studio-code
-    \```
-    # または手動で：
-    # 1. 公式サイトから .dmg ファイルをダウンロード
-    # 2. ダウンロードフォルダでダブルクリック
-    # 3. アプリケーションフォルダにドラッグ&ドロップ
+デプロイ：Render
 
-    2. Python インストール
-    Windows:
+🔗 公開URL
 
-    - [Python公式サイト](https://www.python.org/) へアクセス  
-    「Download Python 3.10.x」をクリック
-    インストーラー実行時：
-    「Add Python to PATH」に必ずチェック ✓
-    「Install launcher for all users」もチェック ✓
-    コマンドプロンプトで確認：
-    \```bash
-    python --version
-    > Python 3.10.X
-    \```
+種別	URL
+フロントエンド	https://ses-extractor-1.onrender.com
+バックエンド	https://ses-extractor.onrender.com
+🚀 主な機能
+🔐 Googleアカウントでログイン（OAuth 2.0）
 
-    Mac:
+📩 Gmailから「SES」「案件」「求人」などのキーワードを含むメールを自動取得
 
-    \```bash
-    # Homebrew経由
-    brew install python@3.10
+🧠 メール本文から以下の情報を抽出：
 
-    # パスを通す
-    echo 'export PATH="/usr/local/opt/python@3.10/bin:$PATH"' >> ~/.zshrc
-    source ~/.zshrc
+件名、発信者、勤務地、単価、必須スキル、尚可スキルなど
 
-    # 確認
-    python3 --version
-    > Python 3.10.X
-    \```
+🗃️ Supabaseに保存（プロジェクト一覧として管理）
 
-    3. MySQL インストール詳細
+⏱️ APSchedulerで毎時自動取得
 
-    Windows:
+🧾 フロントエンドで一覧表示、解析状況などを確認可能
 
-    [MySQL Installerダウンロード](https://dev.mysql.com/downloads/installer/)
-    インストーラー実行：
-    Setup Type: Custom を選択
-    Products: MySQL Server 8.0.X と MySQL Workbench を追加
-    Authentication Method: Use Legacy Authentication Method を選択
-    パスワード設定画面：
-    Root Password: 
-    Windows Service: Configure MySQL Server as a Windows Service をチェック
+📦 ローカルでの実行方法
+1. リポジトリのクローン
+bash
+コピーする
+編集する
+git clone https://github.com/yourusername/ses-extractor.git
+cd ses-extractor
+2. 環境変数の設定
+フロントエンド .env.local
+env
+コピーする
+編集する
+NEXT_PUBLIC_API_BASE_URL=https://ses-extractor.onrender.com
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=あなたのGoogleClientID
+NEXT_PUBLIC_GOOGLE_REDIRECT_URI=https://ses-extractor-1.onrender.com/api/auth/callback/google
+バックエンド .env
+env
+コピーする
+編集する
+SUPABASE_URL=あなたのSupabaseのURL
+SUPABASE_SERVICE_ROLE_KEY=Supabaseのサービスロールキー
+GOOGLE_CLIENT_ID=あなたのGoogleクライアントID
+GOOGLE_CLIENT_SECRET=あなたのGoogleクライアントシークレット
+3. バックエンドの起動（FastAPI）
+bash
+コピーする
+編集する
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --reload
+4. フロントエンドの起動（Next.js）
+bash
+コピーする
+編集する
+cd frontend
+npm install
+npm run dev
+🛠️ データベース構成（Supabase）
+テーブル：ses_projects
 
-    Mac:
+カラム名	型	内容
+id	UUID	主キー
+received_at	timestamp	メール受信日時
+subject	text	メール件名
+sender_email	text	差出人メールアドレス
+project_description	text	メール本文
+required_skills	text	必須スキル
+optional_skills	text	尚可スキル
+location	text	勤務地
+unit_price	text	単価
+message_id	text	GmailメッセージID
+is_parsed	boolean	解析済みフラグ
+processed	boolean	処理済みフラグ
+created_at	timestamp	作成日時（自動生成）
+⏱️ 自動処理の流れ
+APSchedulerが1時間ごとに実行
 
-    \```bash
-    # MySQLサーバーインストール
-    brew install mysql
+OAuthトークンでGmail APIにアクセス
 
-    # 自動起動設定（再起動後も有効）
-    brew services start mysql
+「案件 OR SE OR 求人」＋未ラベルのメールを取得
 
-    # セキュリティ設定
-    mysql_secure_installation
-    # 質問には全てYで回答
+解析対象メールを抽出（添付ファイルのないメール）
 
-    # パスワード設定
-    mysql -u root -p
-    ALTER USER 'root'@'localhost' IDENTIFIED BY '自分が設定したいパスワード';
-    FLUSH PRIVILEGES;
-    exit
-    \```
+Supabaseへ保存・解析
 
-    4.上記なセットアップ終了後VScodeを開く、timelineを開く、以下のコードを書く。
-        \```bash
-        # 1. リポジトリクローン
-        git clone https://github.com/slz520f/ses_extractor.git
-
-        # 2. 仮想環境作成
-        python -m venv venv
-        source venv/bin/activate  # Linux/Mac
-        venv\Scripts\activate    # Windows
-
-        # 3. 依存関係インストール
-        pip install -r requirements.txt
-
-        # 4. 設定ファイル準備
-        \```
-        （GCP/Gmail APIの認証情報を入力）
-            # 4.1 .envファイル準備（秘密情報用）
-                # Gemini 2.0 Flash-Lite API
-                API_KEY=**********
-
-                # MySqlの設定(DATABASE名はses_db,TABLE名はses_projects,ses_projectsの内容はdb/schema.sqlに参照)
-                MYSQL_HOST=localhost # 自分がdatabase作る時選択できる
-                MYSQL_USER=root #自分がdatabase作る時選択できる
-                MYSQL_PASSWORD=********** #自分がdatabase作る時設定したパスワード
-                MYSQL_DATABASE=ses_db #今のコード使うならses_dbにしてください
-
-                # 自分のスプレットシートのID,
-                # 例https://docs.google.com/spreadsheets/d/**********/edit?hl=ja&gid=0#gid=0     ==>****の部分はID
-                SPREADSHEET_ID=**********
-
-                GOOGLE_API_KEY=**********
-                GOOGLE_SHEET_CREDENTIAL=**********
-            # 4.2 config/ファイル準備
-                Google API認証情報取得手順
-                
-                Google Cloud Console設定
-                    ⭕️[Google Cloud Console](https://console.cloud.google.com/) にログイン
-                    ⭕️画面上部のプロジェクト選択 → 「新しいプロジェクト」作成
-                        プロジェクト名：SES-Management
-                        ロケーション：組織なし
-
-                API有効化
-                    ⭕️ナビゲーションメニュー → 「APIとサービス」→「ライブラリ」
-                    ⭕️以下を検索して有効化：
-                        Gmail API
-                        Google Sheets API
-
-                OAuth同意画面設定
-                    ⭕️「OAuth同意画面」→「外部」→「作成」
-                        アプリ情報：
-                            アプリ名：SES Management System
-                            ユーザーサポートメール：自分のアドレス
-                    ⭕️データアクセス→コップ追加：.../auth/gmail.readonly, .../auth/spreadsheets
-
-                認証情報作成
-                    ⭕️「クライアント」→「OAuth クライアントID」
-                    ⭕️アプリケーション種類：デスクトップアプリ
-                    ⭕️名前：Desktop-client
-                    ⭕️「作成」後、JSONをダウンロード → config/credentials.json に保存    
-        # 5.python main.py実行
-
-
-
-#一般ユーザー向け：アプリの使い方
-        #1. 事前準備
-            config/credentials.json をアプリと同じ場所に置く
-
-            .env ファイルを作成し、以下を記載（メモ帳で編集OK）
-
-            env
-            API_KEY=**********
-            MYSQL_HOST=localhost
-            MYSQL_USER=root
-            MYSQL_PASSWORD=**********
-            MYSQL_DATABASE=ses_db
-            SPREADSHEET_ID=**********
-            GOOGLE_API_KEY=**********
-            GOOGLE_SHEET_CREDENTIAL=**********
-        #2. launcher をダブルクリックして実行
-            初回起動時、ブラウザが自動で開き、Streamlit アプリが開始されます。
-
-            ブラウザ上の操作だけで、メール抽出・AI解析・DB保存・Sheets出力ができます。
-
-        📁 配布パッケージ構成
-            
-            ses_extractor_app/
-            │
-            ├─ dist/
-            │   └─ launcher  (実行ファィル)
-            ├─ config/
-            │   └─ credentials.json
-            ├─ .env
-            ├─ README.txt（簡易マニュアル）

@@ -1,35 +1,33 @@
+
+# ses_extractor_bakcend/utils/gemini_and_db.py
 import logging
 import google.generativeai as genai
 from typing import List, Dict, Any 
 import json
 import re
 import os
+import time
 from supabase import create_client, Client
 from datetime import datetime
 from .emails_helper import extract_body, extract_headers, format_datetime
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
+
 # 日志配置
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
 # 配置
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_KEY")
 GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
-GMAIL_API_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
 
-supabase: Client = create_client(
-    os.getenv("SUPABASE_URL"),
-    os.getenv("SUPABASE_KEY")
-)
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_API_KEY)
 
 class GeminiParser:
     def __init__(self, model_name: str = "gemini-1.5-flash-latest", api_key: str = None):
-        """
-        Google Generative AI (Gemini) モデルの初期化
-
-        Args:
-            model_name (str): モデル名
-            api_key (str): 明示的に渡された API キー（オプション）
-        """
         if api_key:
             genai.configure(api_key=api_key)
             logger.info("✅ GeminiParser 内で API キーを構成しました。")
@@ -39,230 +37,231 @@ class GeminiParser:
         self.model = genai.GenerativeModel(model_name)
 
     def _construct_prompt(self, text: str) -> str:
-        """
-        プロンプトの構築（日本語で明確な指示）
-        """
-        return f"""以下はSES案件メールの本文です。以下の項目を日本語で抽出し、JSON形式で返してください。
+        return f"""请严格按照以下要求从邮件文本中提取信息：
 
-### 抽出項目:
-- 案件内容（仕事の詳細）
-- 必須スキル（必須技術・資格）
-- 尚可スキル（あれば良い技術）
-- 勤務地（都道府県または市区町村）
-- 単価（"¥"や"円"を含む文字列）
-
-### 出力形式:
-{{
-  "案件内容": "...",
-  "必須スキル": ["...", "..."],
-  "尚可スキル": ["...", "..."],
-  "勤務地": "...",
-  "単価": "..."
-}}
-
-### メール本文:
+输入文本：
 {text}
 
-### JSON出力:"""
+提取规则：
+1. 每个案件以"▼"或"◆"开头
+2. 按以下格式提取每个案件的信息：
+{{
+  "案件内容": "案件描述",
+  "必須スキル": ["技能1", "技能2"],
+  "勤務地": "工作地点",
+  "単価": "薪资信息"
+}}
 
-    def _parse_output(self, output: str) -> Dict[str, Any]:
-        """
-        モデルの生出力からJSON部分を抽出
-        """
-        json_match = re.search(r'\{[\s\S]*\}', output)
-        if not json_match:
-            raise ValueError("出力にJSONが見つかりません")
+输出要求：
+- 必须是有效的JSON数组
+- 不要包含任何额外解释
+- 如果字段不存在则留空
+- 薪资信息只保留第一个价格（如"600万円～900万円" → "600万円"）
+
+示例输出：
+[
+  {{
+    "案件内容": "データ分析業務",
+    "必須スキル": ["Python", "SQL"],
+    "勤務地": "東京",
+    "単価": "時給2000円"
+  }}
+]"""
+
+    @staticmethod
+    def normalize_price(price_str: str) -> str:
+        if not price_str:
+            return ""
+        price_str = price_str.split("～")[0].split(",")[0]
+        match = re.search(r"(\d+\.?\d*)(万?円|万円|円)", price_str)
+        return f"{match.group(1)}{match.group(2)}" if match else price_str
+
+    def parse_email(self, text: str) -> List[Dict[str, Any]]:
+        try:
+            # 尝试使用Gemini API解析
+            return self._parse_with_gemini(text)
+        except Exception as e:
+            logger.error(f"Gemini解析失败，使用备用解析: {str(e)}")
+            return self._fallback_parse(text)
+
+    def _parse_with_gemini(self, text: str) -> List[Dict[str, Any]]:
+        response = self.model.generate_content(self._construct_prompt(text))
+        output = getattr(response, 'text', str(response))
+        output = output.replace("```json", "").replace("```", "").strip()
         
-        json_str = json_match.group(0)
+        logger.debug(f"Gemini原始响应:\n{output}")
         
         try:
-            parsed = json.loads(json_str)
-            required_fields = ["案件内容", "必須スキル", "勤務地", "単価"]
-            for field in required_fields:
-                if field not in parsed:
-                    raise ValueError(f"必須フィールド '{field}' が見つかりません")
-                    
-            if isinstance(parsed["必須スキル"], str):
-                parsed["必須スキル"] = [s.strip() for s in parsed["必須スキル"].split(",") if s.strip()]
-            if isinstance(parsed.get("尚可スキル", []), str):
-                parsed["尚可スキル"] = [s.strip() for s in parsed["尚可スキル"].split(",") if s.strip()]
-                
-            return parsed
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON解析エラー: {e}\n出力内容: {output}")
+            parsed = json.loads(output)
+            if isinstance(parsed, dict):
+                return [self._validate_project(parsed)]
+            return [self._validate_project(p) for p in parsed]
+        except json.JSONDecodeError:
+            json_match = re.search(r'\{[\s\S]*\}', output)
+            if json_match:
+                return [self._validate_project(json.loads(json_match.group(0)))]
             raise
 
-    def parse_email(self, text: str) -> Dict[str, Any]:
-        """
-        メール本文を解析して構造化データを返す
+    def _fallback_parse(self, text: str) -> List[Dict[str, Any]]:
+        """针对真实邮件格式的增强解析"""
+        projects = []
         
-        Args:
-            text (str): メール本文テキスト
-            
-        Returns:
-            dict: 解析結果（エラー時はデフォルト値が入る）
-        """
-
-
+        # 分割不同案件 - 根据实际邮件的分隔符
+        project_sections = re.split(r'(?:\n|^)(?:■|◆)(.+?)\n', text)[1:]
         
-
-        prompt = self._construct_prompt(text)
-
-        try:
-            response = self.model.generate_content(prompt)
-            output = response.text.strip()
-            logger.debug(f"モデル生出力:\n{output}")
-            return self._parse_output(output)
+        for i in range(0, len(project_sections), 2):
+            if i+1 >= len(project_sections):
+                continue
+                
+            title = project_sections[i].strip()
+            content = project_sections[i+1]
             
-        except Exception as e:
-            logger.error(f"予期せぬエラー: {str(e)}")
-        return {
-            "案件内容": "",
+            project = {
+                "案件内容": title,
+                "必須スキル": [],
+                "尚可スキル": [],
+                "勤務地": "",
+                "単価": ""
+            }
+            
+            # 提取薪资
+            salary_match = re.search(r'\[ *給与 *\] (.+)', content)
+            if salary_match:
+                project["単価"] = self.normalize_price(salary_match.group(1))
+            
+            # 提取工作地点
+            location_match = re.search(r'\[ *場所 *\] (.+)', content)
+            if location_match:
+                project["勤務地"] = location_match.group(1).strip()
+            
+            projects.append(project)
+        
+        return projects if projects else [{
+            "案件内容": text[:200] + "..." if len(text) > 200 else text,
             "必須スキル": [],
-            "尚可スキル": [],
             "勤務地": "",
             "単価": ""
-        }
+        }]
 
+    def _validate_project(self, project: Dict[str, Any]) -> Dict[str, Any]:
+        for field in ["案件内容", "必須スキル", "勤務地", "単価"]:
+            project.setdefault(field, "")
+        
+        if isinstance(project["必須スキル"], str):
+            project["必須スキル"] = [s.strip() for s in project["必須スキル"].split(',') if s.strip()]
+        
+        project["単価"] = self.normalize_price(project["単価"])
+        return project
 
-
-#有增量的parse_emails_with_gemini
 def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key=None) -> List[Dict]:
-    import google.generativeai as genai
-
-
-    if api_key:
-        genai.configure(api_key=api_key)
-        logger.info("✅ 明示された API キーで Gemini を構成しました。")
-    else:
-        env_key = os.getenv("GOOGLE_API_KEY")
-        if env_key:
-            genai.configure(api_key=env_key)
-            logger.info("✅ 環境変数から API キーを読み取りました。")
-            api_key = env_key  # パーサーにも渡すため
-        else:
-            logger.error("❌ Gemini APIキーが見つかりません。")
+    if not api_key:
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
             raise ValueError("Gemini APIキーが必要です。")
 
-
-    parser = GeminiParser(api_key=api_key)  # パーサーにも渡す
-    email_data_list = []
-
+    genai.configure(api_key=api_key)
+    parser = GeminiParser(api_key=api_key)
+    results = []
 
     for i, email in enumerate(emails, 1):
         if progress_callback:
             progress_callback(i / len(emails))
 
-
-        logging.info(f"\n--- メール {i}/{len(emails)} を処理中 ---")
+        logger.info(f"\n--- 处理邮件 {i}/{len(emails)} ---")
         
-
-        subject = extract_headers(email, 'Subject')
-        sender = extract_headers(email, 'From')
-        date = format_datetime(extract_headers(email, 'Date'))
-        body_text = extract_body(email)
-
-
-        logging.info(f"件名: {subject}")
-        logging.info(f"送信者: {sender}")
-        logging.info(f"日付: {date}")
-
-        if not body_text.strip():
-            logging.warning("⚠️ 本文が空です。スキップします。")
-
-            continue
-
         try:
-            parsed = parser.parse_email(body_text)
+            # 提取邮件基本信息
+            subject = extract_headers(email, 'Subject')
+            sender = extract_headers(email, 'From')
+            date = format_datetime(extract_headers(email, 'Date'))
+            body = extract_body(email)
 
-            logging.info("解析結果:")
+            if not body.strip():
+                logger.warning("⚠️ 空正文，跳过")
+                continue
 
-
-            logging.info(json.dumps(parsed, indent=2, ensure_ascii=False))
-
-            email_data = {
-                'received_at': date,
-                'subject': subject,
-                'sender_email': sender,
-                'project_description': parsed.get('案件内容', ''),
-                'required_skills': parsed.get('必須スキル', []),
-                'optional_skills': parsed.get('尚可スキル', []),
-                "location": parsed.get("勤務地", ""),
-                "unit_price": parsed.get("単価", ""),
-                'message_id': email.get('id')
-
-            }
-
-            email_data_list.append(email_data)
+            # 解析邮件正文
+            projects = parser.parse_email(body)
+            logger.debug(f"解析出的项目数: {len(projects)}")
+            
+            # 为每个项目构建完整数据
+            for idx, project in enumerate(projects, 1):
+                project_data = {
+                    'received_at': date,
+                    'subject': f"{subject} (案件{idx})" if len(projects) > 1 else subject,
+                    'sender_email': sender,
+                    'project_description': project.get("案件内容", ""),
+                    'required_skills': project.get("必須スキル", []),
+                    'optional_skills': project.get("尚可スキル", []),
+                    'location': project.get("勤務地", ""),
+                    'unit_price': project.get("単価", ""),
+                    'message_id': email.get('id', f"gen_{int(time.time())}_{i}_{idx}"),
+                    'project_index': idx
+                }
+                logger.debug(f"项目{idx}数据: {json.dumps(project_data, ensure_ascii=False)}")
+                results.append(project_data)
 
         except Exception as e:
+            logger.error(f"邮件处理失败: {str(e)}", exc_info=True)
 
-            logging.error(f"❌ メールの処理中にエラーが発生しました: {str(e)}")
-
-
-    return email_data_list
+    return results
 
 def send_to_api(email_data_list):
-    # 初始化Supabase客户端
-    supabase = create_client(SUPABASE_URL, SUPABASE_API_KEY)
-    success_count = 0
-    error_count = 0
+    if not email_data_list:
+        logger.warning("⚠️ 无数据需要插入")
+        return
+
+    success = error = 0
     
-    for email_data in email_data_list:
+    for data in email_data_list:
         try:
-            # 强化数据预处理
-            data = {
-                "message_id": email_data['message_id'],
-                "received_at": datetime.strptime(email_data['received_at'], "%Y-%m-%d %H:%M:%S").isoformat(),
-                "subject": str(email_data.get('subject', '')),
-                "sender_email": str(email_data.get('sender_email', '')),
-                "project_description": list_to_str(email_data.get('project_description', []))or "无案件描述",  # 默认值处理
-                "required_skills": list_to_str(email_data.get('required_skills', [])),
-                "optional_skills": list_to_str(email_data.get('optional_skills', [])),
-                "location": list_to_str(email_data.get('location', [])),
-                "unit_price": list_to_str(email_data.get('unit_price', []), max_length=500)  # 防止超长
+            # 数据预处理
+            insert_data = {
+                "message_id": data['message_id'],
+                "received_at": datetime.strptime(
+                    data['received_at'], "%Y-%m-%d %H:%M:%S"
+                ).isoformat(),
+                "subject": str(data.get('subject', '無題'))[:200],
+                "sender_email": str(data.get('sender_email', ''))[:100],
+                "project_description": str(data.get('project_description', '無案件描述'))[:500],
+                "required_skills": list_to_str(data.get('required_skills', []))[:500],
+                "optional_skills": list_to_str(data.get('optional_skills', []))[:500],
+                "location": str(data.get('location', ''))[:100],
+                "unit_price": str(data.get('unit_price', ''))[:100],
+                "project_index": int(data.get('project_index', 0))
             }
 
-            # 在插入前进行检查和默认值填充
-            if not data["project_description"]:
-                data["project_description"] = "无案件描述"  # 默认值
-                # 检查message_id是否已存在于数据库中
-            existing_data = supabase.table('ses_projects').select('message_id').eq('message_id', data['message_id']).execute()
+            logger.debug(f"准备插入数据: message_id={insert_data['message_id']}, project_index={insert_data['project_index']}")
 
-            if existing_data.data and len(existing_data.data) > 0:
-                # 如果已经存在，则跳过插入
-                logger.info(f"✅ 数据已存在，跳过插入: {data['message_id']}")
-                continue  # 跳过本次循环
+            # 检查是否存在（更精确的查询）
+            exists = supabase.table('ses_projects') \
+                .select('*', count='exact') \
+                .eq('message_id', insert_data['message_id']) \
+                .eq('project_index', insert_data['project_index']) \
+                .execute()
 
-            # 插入数据到 Supabase
-            response = supabase.table('ses_projects').insert(data).execute()
-
-
-            
-            # 检查是否插入成功
-            if response.data and len(response.data) > 0:
-                success_count += 1
-                logger.info(f"✅ 数据插入成功: {email_data['message_id']}")
+            if exists.count == 0:
+                # 插入数据（使用单条插入确保原子性）
+                response = supabase.table('ses_projects').insert(insert_data).execute()
+                
+                if response.data and len(response.data) > 0:
+                    success += 1
+                    logger.info(f"插入成功: {insert_data['message_id']}-{insert_data['project_index']}")
+                else:
+                    error += 1
+                    logger.error(f"插入失败: {getattr(response, 'error', '未知错误')}")
             else:
-                error_count += 1
-                logger.error(f"❌ 数据插入失败: {response.error}")
-                # 输出更多的错误信息
-                if response.error:
-                    logger.error(f"❌ 返回的错误信息: {response.error}")
-                
+                logger.info(f"记录已存在，跳过: {insert_data['message_id']}-{insert_data['project_index']}")
+
         except Exception as e:
-            error_count += 1
-            logger.error(f"⚠️ 数据库操作异常: {str(e)}")
-            # 输出异常的详细信息
-            logger.error(f"⚠️ 异常详情: {e}")
-    
-    logger.info(f"处理完成: 成功{success_count}条, 失败{error_count}条")
-                
-  
+            error += 1
+            logger.error(f"数据库操作失败 - message_id={data.get('message_id')}, project_index={data.get('project_index')}: {str(e)}", 
+                        exc_info=True)
+
+    logger.info(f"处理结果: 成功={success}, 失败={error}")
+    return success, error
 
 def list_to_str(value, delimiter=", ", max_length=None):
-    """安全处理列表转字符串"""
     if isinstance(value, list):
         joined = delimiter.join(str(item) for item in value)
         return joined[:max_length] if max_length else joined

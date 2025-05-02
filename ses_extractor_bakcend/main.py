@@ -4,6 +4,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from routers import projects
 import os
 from dotenv import load_dotenv
+# ロギング設定を追加（main.pyなどに）
+import logging
+logging.basicConfig(level=logging.DEBUG)
 app = FastAPI()
 load_dotenv()  # 加载 .env 文件中的环境变量
 

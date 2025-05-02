@@ -1,23 +1,19 @@
-from fastapi import APIRouter, HTTPException
+#ses_extractor_bakcend/routers/emails.py
+from fastapi import APIRouter, HTTPException,Depends
 from fastapi.responses import JSONResponse
-
-
 import os
 import logging
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
-from routers.auth import token_store
 from supabase import create_client, Client
 from typing import Set
-
-from utils.emails import fetch_ses_emails, refresh_access_token
+from utils.emails import fetch_ses_emails
 from utils.gemini_and_db import parse_emails_with_gemini, send_to_api
-
-
-
+from services.auth_service import AuthService
+from middleware.auth import get_current_user
 # 初始化
 router = APIRouter()
-
+auth_service = AuthService()
 load_dotenv()
 
 # 配置
@@ -39,125 +35,106 @@ logger.setLevel(logging.DEBUG)
 def get_parsed_message_ids() -> Set[str]:
     from supabase import create_client
     supabase = create_client(SUPABASE_URL, SUPABASE_API_KEY)
+    # 查询ses_projects表中所有message_id
     result = supabase.table("ses_projects").select("message_id").execute()
+    # 提取非空的message_id并转为集合
     ids = set(item["message_id"] for item in result.data if item.get("message_id"))
     return ids
 
 
 # 获取 SES 邮件接口
 @router.get("/fetch_emails")
-async def fetch_emails():
-    access_token = token_store.get("access_token")
-    refresh_token = token_store.get("refresh_token")
-    logger.info(f"Access token: {access_token}")
-    if not access_token:
-        raise HTTPException(status_code=401, detail="未登录或Token已失效")
-
+async def fetch_emails(user_email: str = Depends(get_current_user)):
+    """获取SES邮件"""
     try:
+        access_token = auth_service.get_valid_token(user_email)
         emails = fetch_ses_emails(access_token)
+        logger.info(f"用户 {user_email} 获取了 {len(emails)} 封邮件")
         return {"emails": emails}
-
+    except HTTPException:
+        raise
     except Exception as e:
-        # 处理token过期
-        if "invalid_grant" in str(e) or "Invalid Credentials" in str(e) or "401" in str(e):
-            logger.warning("Access token 已过期，尝试刷新...")
-            if not refresh_token:
-                raise HTTPException(status_code=401, detail="Refresh token 不存在，无法刷新。")
-            
-            try:
-                new_access_token = refresh_access_token(refresh_token)
-                token_store["access_token"] = new_access_token
-                logger.info("✅ Access token 刷新成功，重新尝试fetch邮件...")
-                
-                # 刷新后重新尝试
-                emails = fetch_ses_emails(new_access_token)
-                return {"emails": emails}
-            
-            except Exception as refresh_error:
-                logger.error(f"Token刷新失败: {str(refresh_error)}")
-                raise HTTPException(status_code=401, detail="Token刷新失败，请重新登录。")
-        else:
-            logger.error(f"未知错误: {str(e)}")
-            raise HTTPException(status_code=500, detail=f"内部错误: {str(e)}")
+        logger.error(f"获取邮件失败: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"邮件获取失败: {str(e)}"
+        )
     
-
-
 # 解析所有邮件并保存到数据库
 @router.post("/parse_and_save_all_emails")
-async def parse_and_save_all_emails():
-    access_token = token_store.get("access_token")
-    if not access_token:
-        raise HTTPException(status_code=401, detail="未登录或Token已失效")
+async def parse_and_save_all_emails(user_email: str = Depends(get_current_user)):
+    try:
+        # 获取邮件
+        access_token = auth_service.get_valid_token(user_email)
+        ses_emails = fetch_ses_emails(access_token)
+        total_fetched = len(ses_emails)
+        logging.info(f"📥 抓取到的邮件总数: {total_fetched}")
 
-    # 获取邮件
-    ses_emails = fetch_ses_emails(access_token)
-    total_fetched = len(ses_emails)
-    logging.info(f"📥 抓取到的邮件总数: {total_fetched}")
+        # 获取已经解析过的 message_id
+        parsed_ids = get_parsed_message_ids()
+        logging.info(f"📂 数据库中已存在的解析记录数: {len(parsed_ids)}")
 
-    # 获取已经解析过的 message_id
-    parsed_ids = get_parsed_message_ids()
-    logging.info(f"📂 数据库中已存在的解析记录数: {len(parsed_ids)}")
+        # 过滤掉已解析的邮件
+        unparsed_emails = [email for email in ses_emails if email.get("id") not in parsed_ids]
+        logging.info(f"🧹 过滤后未解析邮件数: {len(unparsed_emails)}")
+        logging.info(f"♻️ 重复（已解析）邮件数: {total_fetched - len(unparsed_emails)}")
 
-    # 过滤掉已解析的邮件
-    unparsed_emails = [email for email in ses_emails if email.get("id") not in parsed_ids]
-    logging.info(f"🧹 过滤后未解析邮件数: {len(unparsed_emails)}")
-    logging.info(f"♻️ 重复（已解析）邮件数: {total_fetched - len(unparsed_emails)}")
+        # 如果没有新邮件需要解析
+        if not unparsed_emails:
+            logging.info("✅ 没有新邮件需要解析。")
+            return JSONResponse(content={
+                "status": "success", 
+                "processed_count": 0, 
+                "message": "没有新邮件需要解析",
+                "logs": {
+                    "total_fetched": total_fetched,
+                    "parsed_count": len(parsed_ids),
+                    "unparsed_count": 0,
+                    "duplicate_count": total_fetched,
+                    "processed_count": 0,
+                    "message": "没有新邮件需要解析"
+                }
+            })
 
-    if not unparsed_emails:
-        logging.info("✅ 没有新邮件需要解析。")
+        # 使用Gemini解析
+        email_data_list = parse_emails_with_gemini(unparsed_emails)
+
+        # 发送到API或保存数据库
+        send_to_api(email_data_list)
+
+        logging.info(f"✅ 实际解析并写入的邮件数: {len(email_data_list)}")
+
         return JSONResponse(content={
-            "status": "success", 
-            "processed_count": 0, 
-            "message": "没有新邮件需要解析",
+            "status": "success",
+            "processed_count": len(email_data_list),
             "logs": {
                 "total_fetched": total_fetched,
                 "parsed_count": len(parsed_ids),
-                "unparsed_count": 0,
-                "duplicate_count": total_fetched,
-                "processed_count": 0,
-                "message": "没有新邮件需要解析"
+                "unparsed_count": len(unparsed_emails),
+                "duplicate_count": total_fetched - len(unparsed_emails),
+                "processed_count": len(email_data_list),
+                "message": "解析成功"
             }
         })
-
-    # 使用Gemini解析
-    email_data_list = parse_emails_with_gemini(unparsed_emails)
-
-    # 发送到API或保存数据库
-    send_to_api(email_data_list)
-
-    logging.info(f"✅ 实际解析并写入的邮件数: {len(email_data_list)}")
-
-    return JSONResponse(content={
-        "status": "success",
-        "processed_count": len(email_data_list),
-        "logs": {
-            "total_fetched": total_fetched,
-            "parsed_count": len(parsed_ids),
-            "unparsed_count": len(unparsed_emails),
-            "duplicate_count": total_fetched - len(unparsed_emails),
-            "processed_count": len(email_data_list),
-            "message": "解析成功"
-        }
-    })
-
-
+    except Exception as e:
+        logger.error(f"解析保存失败: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"邮件解析保存失败: {str(e)}"
+            )
 
 
 
 @router.get("/recent")
 async def get_recent_emails():
     """
-    获取近5天的邮件数据（修复版）
+    获取近14天的邮件数据（修复版）
     """
     try:
         # 获取当前时间（带时区信息）
         now = datetime.now(timezone.utc)
-        five_days_ago = now - timedelta(days=5)
-
+        five_days_ago = now - timedelta(days=14)
         logger.info(f"查询时间范围: {five_days_ago.isoformat()} 至 {now.isoformat()}")
-        
-       
-
        # 查询数据库
         response = supabase.table('ses_projects') \
             .select('*') \
