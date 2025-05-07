@@ -128,3 +128,40 @@ async def parse_and_save_all_emails(user_email: str = Depends(get_current_user))
             status_code=500,
             detail=f"メールの解析保存に失敗しました: {str(e)}"
             )
+    
+
+@router.get("/recent")
+async def get_recent_emails():
+    """
+    获取近14天的邮件数据（修复版）
+    """
+    try:
+        # 获取当前时间（带时区信息）
+        now = datetime.now(timezone.utc)
+        five_days_ago = now - timedelta(days=14)
+
+        logger.info(f"查询时间范围: {five_days_ago.isoformat()} 至 {now.isoformat()}")
+
+
+
+       # 查询数据库
+        response = supabase.table('ses_projects') \
+            .select('*') \
+            .gte('received_at', five_days_ago.isoformat()) \
+            .order('received_at', desc=True) \
+            .execute()
+
+        # 检查错误
+        if hasattr(response, 'error') and response.error:
+            logger.error(f"Supabase查询错误: {response.error}")
+            raise HTTPException(status_code=500, detail="数据库查询失败")
+
+        logger.info(f"查询到 {len(response.data)} 条记录")
+        return {"emails": response.data}
+
+    except Exception as e:
+        logger.error(f"获取近期邮件失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="获取近期邮件失败")
+
+
+
