@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 from google_auth_oauthlib.flow import Flow
 import os
@@ -7,7 +7,8 @@ import requests
 import logging
 import secrets
 from services.auth_service import AuthService
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from typing import Annotated
 
 # 初始化
 load_dotenv()
@@ -117,11 +118,12 @@ async def auth_callback(request: Request):
         # frontend_home_url = "http://localhost:3000/auth/callback" 
         frontend_home_url = "https://ses-extractor-1.onrender.com/auth/callback"
         return RedirectResponse(url=f"{frontend_home_url}/?email={user_email}&access_token={jwt_token}")
+   
         
 
     except Exception as e:
-        logger.error(f"登录失败: {str(e)}")
-        return JSONResponse(
-            content={"error": "登录处理失败"},
-            status_code=500
-        )
+        logger.error(f"回调处理失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=400, detail={
+            "error": "authentication_failed",
+            "message": str(e)
+        })

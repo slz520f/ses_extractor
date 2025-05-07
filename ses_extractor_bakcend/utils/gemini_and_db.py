@@ -153,6 +153,37 @@ class GeminiParser:
         project["単価"] = self.normalize_price(project["単価"])
         return project
 
+# 新增存储原始邮件的函数
+def save_raw_email(message_id: str, email_data: dict) :
+    """存储原始邮件到raw_emails表"""
+    try:
+        if not message_id or not email_data:
+            logger.warning(f"无效参数: message_id={message_id}, email_data={bool(email_data)}")
+            return None
+            
+        insert_data = {
+            "message_id": str(message_id)[:100],  # 限制长度
+            "raw_data": json.dumps(email_data, ensure_ascii=False),
+
+        }
+        
+        response = supabase.table('raw_emails') \
+            .insert(insert_data) \
+            .execute()
+            
+        if not response.data:
+            logger.error("插入原始邮件失败: 无返回数据")
+            return None
+            
+        logger.info(f"存储原始邮件成功: ID={response.data[0]['id']}")
+        return response.data[0]['id']
+        
+    except Exception as e:
+        logger.error(f"存储原始邮件失败 - message_id={message_id}: {str(e)}", exc_info=True)
+        return None
+
+
+
 def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key=None) -> List[Dict]:
     if not api_key:
         api_key = os.getenv("GOOGLE_API_KEY")
@@ -170,6 +201,11 @@ def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key
         logger.info(f"\n--- 处理邮件 {i}/{len(emails)} ---")
         
         try:
+            # 在解析前存储原始邮件（添加这1行）
+            raw_email_id = save_raw_email(email.get('id'), email)
+            if not raw_email_id:
+                logger.warning(f"⚠️ 邮件 {email.get('id')} 原始内容存储失败，跳过处理")
+                continue
             # 提取邮件基本信息
             subject = extract_headers(email, 'Subject')
             sender = extract_headers(email, 'From')
@@ -196,7 +232,9 @@ def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key
                     'location': project.get("勤務地", ""),
                     'unit_price': project.get("単価", ""),
                     'message_id': email.get('id', f"gen_{int(time.time())}_{i}_{idx}"),
-                    'project_index': idx
+                    'project_index': idx,
+                    'raw_email_id': raw_email_id,  # 添加这1个新字段
+                    'original_message_id': email.get('id')  # 新增原始消息ID
                 }
                 logger.debug(f"项目{idx}数据: {json.dumps(project_data, ensure_ascii=False)}")
                 results.append(project_data)
@@ -228,7 +266,9 @@ def send_to_api(email_data_list):
                 "optional_skills": list_to_str(data.get('optional_skills', []))[:500],
                 "location": str(data.get('location', ''))[:100],
                 "unit_price": str(data.get('unit_price', ''))[:100],
-                "project_index": int(data.get('project_index', 0))
+                "project_index": int(data.get('project_index', 0)),
+                "raw_email_id": data.get('raw_email_id'),
+                "original_message_id": data.get('original_message_id')  # 新增字段
             }
 
             logger.debug(f"准备插入数据: message_id={insert_data['message_id']}, project_index={insert_data['project_index']}")
@@ -238,6 +278,7 @@ def send_to_api(email_data_list):
                 .select('*', count='exact') \
                 .eq('message_id', insert_data['message_id']) \
                 .eq('project_index', insert_data['project_index']) \
+                .eq('raw_email_id', insert_data['raw_email_id']) \
                 .execute()
 
             if exists.count == 0:

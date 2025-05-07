@@ -1,19 +1,20 @@
-//ses_extractor_frontend/src/app/auth/callback/page.tsx
 'use client';
 
 import { useEmailAuth } from '@/hooks/useEmailAuth';
-import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails } from '@/services/emailService';
+import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails, getRawEmail } from '@/services/emailService';
 import { EmailTable } from '@/components/EmailTable';
 import { useEffect, useState, useRef } from 'react';
 import {
   Button, CloseButton, Drawer, Portal, DrawerBody, DrawerHeader, DrawerFooter, DrawerContent, DrawerTitle,
   DrawerBackdrop, DrawerPositioner, DrawerCloseTrigger, DrawerActionTrigger,
-  Progress, Box, Text, VStack
+  Progress, Box, Text, VStack, Code
 } from "@chakra-ui/react";
 import { createStandaloneToast } from '@chakra-ui/toast';
 import ApiKeyInput from '@/components/ApiKeyInput';
 
 interface Email {
+  id?: string;
+  raw_email_id?: string;
   sender_email: string;
   subject: string;
   received_at: string;
@@ -24,23 +25,33 @@ interface Email {
   unit_price: string;
 }
 
+interface ProcessStatus {
+  fetched: number;
+  parsed: number;
+  logs: string[];
+  fetchProgress: number;
+  parseProgress: number;
+}
+
 export default function CallbackPage() {
   const { loading, error, userEmail, accessToken } = useEmailAuth();
   const [recentEmails, setRecentEmails] = useState<Email[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-  const [fetchedEmailCount, setFetchedEmailCount] = useState<number | null>(null);
-  const [parsedEmailCount, setParsedEmailCount] = useState<number | null>(null);
+  const [rawContent, setRawContent] = useState<string>('');
+  const [status, setStatus] = useState<ProcessStatus>({
+    fetched: 0,
+    parsed: 0,
+    logs: [],
+    fetchProgress: 0,
+    parseProgress: 0
+  });
   const [nextFetchTime, setNextFetchTime] = useState<string>('');
   const { toast } = createStandaloneToast();
-  const [previousFetchedEmailCount, setPreviousFetchedEmailCount] = useState<number | null>(null);
-  const [fetchProgress, setFetchProgress] = useState(0);
-  const [parseProgress, setParseProgress] = useState(0);
-  const [logs, setLogs] = useState<string[]>([]);
   const retryTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
 
-  // 计算下次获取时间
+  // 次回取得時間を計算
   const calculateNextFetchTime = () => {
     const now = new Date();
     const nextHour = new Date(now);
@@ -50,7 +61,7 @@ export default function CallbackPage() {
     return nextHour.toLocaleTimeString();
   };
 
-  // 检查是否需要自动获取邮件
+  // 自動取得が必要かチェック
   const checkAutoFetch = () => {
     const now = new Date();
     const nextFetch = new Date(now);
@@ -62,7 +73,7 @@ export default function CallbackPage() {
     }
   };
 
-  // 设置定时器，每分钟检查一次时间
+  // タイマー設定（1分ごとに時間チェック）
   useEffect(() => {
     const timer = setInterval(() => {
       setNextFetchTime(calculateNextFetchTime());
@@ -72,44 +83,40 @@ export default function CallbackPage() {
     return () => clearInterval(timer);
   }, []);
 
-  // 获取邮件函数 - 已优化进度条
+  // メール取得関数
   const handleFetchEmails = async () => {
     if (!accessToken) return;
     
     try {
-      setFetchProgress(0);
-      // 模拟进度动画
+      setStatus(prev => ({...prev, fetchProgress: 0}));
+      
+      // プログレスアニメーション
       for (let i = 0; i <= 90; i += 10) {
         await new Promise(resolve => setTimeout(resolve, 200));
-        setFetchProgress(i);
+        setStatus(prev => ({...prev, fetchProgress: i}));
       }
 
       const result = await fetchEmails(accessToken);
       const newFetchedCount = result.emails?.length || 0;
       
-      // 完成进度
-      setFetchProgress(100);
+      // プログレス完了
+      setStatus(prev => ({
+        ...prev,
+        fetchProgress: 100,
+        fetched: newFetchedCount
+      }));
+      
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // 更新邮件计数
-      if (previousFetchedEmailCount !== null) {
-        const newEmailsCount = newFetchedCount - previousFetchedEmailCount;
-        setFetchedEmailCount(Math.max(0, newEmailsCount));
-      } else {
-        setFetchedEmailCount(newFetchedCount);
-      }
-
-      setPreviousFetchedEmailCount(newFetchedCount);
-      
-      // 获取后自动加载最新邮件
+      // 取得後自動で最新メールをロード
       await loadRecentEmails();
       
     } catch (error) {
-      console.error("获取邮件失败:", error);
-      setFetchProgress(0);
+      console.error("メール取得失敗:", error);
+      setStatus(prev => ({...prev, fetchProgress: 0}));
       toast({
-        title: '获取失败',
-        description: '获取邮件时出错',
+        title: '取得失敗',
+        description: 'メール取得中にエラーが発生しました',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -117,100 +124,102 @@ export default function CallbackPage() {
     }
   };
 
-  // 修改解析邮件的函数
+  // メール解析関数
   const handleParseAndSaveAllEmails = async () => {
-    if (!accessToken || !fetchedEmailCount) return;
+    if (!accessToken || !status.fetched) return;
 
     setIsProcessing(true);
-    setParseProgress(0);
-    setParsedEmailCount(0);
-    setLogs([]);
+    setStatus(prev => ({
+      ...prev,
+      parseProgress: 0,
+      parsed: 0,
+      logs: []
+    }));
 
     try {
       let successCount = 0;
-      
-      // 添加完成状态标记
       let isCompleted = false;
 
-      // 平滑进度更新函数
+      // スムーズなプログレス更新
       const updateProgress = async (target: number) => {
-        while (parseProgress < target && !isCompleted) {
-          setParseProgress(prev => Math.min(prev + 2, target));
+        while (status.parseProgress < target && !isCompleted) {
+          setStatus(prev => ({
+            ...prev,
+            parseProgress: Math.min(prev.parseProgress + 2, target)
+          }));
           await new Promise(resolve => setTimeout(resolve, 50));
         }
       };
 
-      // 实际解析任务
+      // 実際の解析タスク
       const parseTask = async () => {
         try {
           const result = await parseAndSaveAllEmails(accessToken);
           const parsedCount = result.parsedCount || result.parsedEmails?.length || 0;
           successCount = parsedCount;
           
-          // 确保最终进度为100%
-          setParseProgress(100);
-          setParsedEmailCount(parsedCount);
+          // ステータス更新
+          setStatus(prev => ({
+            ...prev,
+            parseProgress: 100,
+            parsed: parsedCount,
+            logs: Array.isArray(result.parsedEmails) 
+              ? [...prev.logs, ...result.parsedEmails.map((e:Email) => e.subject)]
+              : prev.logs
+          }));
           
-          // 更新日志
-          if (Array.isArray(result.parsedEmails)) {
-            setLogs(prev => [...prev, ...result.parsedEmails.map((e:Email) => e.subject)]);
-          }
-
-          // 标记完成
           isCompleted = true;
-          
           return result;
         } catch (err) {
           throw err;
         }
       };
 
-      // 并行执行进度更新和解析任务
+      // 並列実行（プログレス更新と解析タスク）
       await Promise.all([
-        updateProgress(95), // 留5%给完成动画
+        updateProgress(95),
         parseTask()
       ]);
 
-      // 最终完成动画
+      // 最終アニメーション
       await updateProgress(100);
 
       toast({
-        title: '解析完成',
-        description: `成功解析并保存 ${successCount} 封邮件`,
+        title: '解析完了',
+        description: `${successCount} 通のメールを正常に解析・保存しました`,
         status: 'success',
         duration: 3000,
         isClosable: true,
       });
 
-      // 重新加载邮件列表
+      // メールリスト再読み込み
       await loadRecentEmails();
 
     } catch (err: unknown) {
-      const errorMessage = err instanceof Error ? err.message : '解析邮件失败';
+      const errorMessage = err instanceof Error ? err.message : 'メール解析に失敗しました';
       toast({
-        title: '错误',
+        title: 'エラー',
         description: errorMessage,
         status: 'error',
         duration: 3000,
         isClosable: true,
       });
-      setParseProgress(0);
+      setStatus(prev => ({...prev, parseProgress: 0}));
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // 加载最新邮件 - 已优化
+  // 最新メール読み込み
   const loadRecentEmails = async () => {
     if (!accessToken) return;
     
     setIsLoadingEmails(true);
     try {
       const result = await fetchRecentEmails(accessToken);
-      // 使用函数式更新确保状态正确
       setRecentEmails(prev => {
         const newEmails = result.emails || [];
-        // 去重逻辑
+        // 重複排除
         const uniqueEmails = newEmails.filter(
           (email:Email, index:number, self:Email[]) =>
             index === self.findIndex(e => e.subject === email.subject)
@@ -218,27 +227,87 @@ export default function CallbackPage() {
         return [...uniqueEmails];
       });
     } catch (error) {
-      console.error("加载邮件失败:", error);
+      console.error("メール読み込み失敗:", error);
     } finally {
       setIsLoadingEmails(false);
     }
   };
 
-  // 手动立即触发
+  // 手動トリガー
   const handleManualTrigger = async () => {
     await handleFetchEmails();
     await handleParseAndSaveAllEmails();
     setNextFetchTime(calculateNextFetchTime());
   };
 
-  // 点击邮件显示详情
+  // メールクリック時の詳細表示
   const drawerTriggerRef = useRef<HTMLButtonElement>(null);
-  const handleEmailClick = (email: Email) => {
+  const handleEmailClick = async (email: Email) => {
     setSelectedEmail(email);
     drawerTriggerRef.current?.click();
+  
+    if (!email.raw_email_id) {
+      setRawContent('生メール内容なし');
+      return;
+    }
+  
+    try {
+      setIsLoadingEmails(true);
+      console.log('生メール取得中、ID:', email.raw_email_id);
+      
+      const response = await getRawEmail(Number(email.raw_email_id), accessToken || '');
+      console.log('生メールレスポンス:', response);
+  
+      if (response.success) {
+        let displayContent = '';
+  
+        // ヘッダー情報追加
+        if (response.data.headers) {
+          displayContent += `差出人: ${response.data.headers.From || '不明'}\n`;
+          displayContent += `件名: ${response.data.headers.Subject || '無題'}\n`;
+          displayContent += `日付: ${response.data.headers.Date || '不明'}\n\n`;
+        }
+  
+        // 本文追加
+        if (response.data.body) {
+          const cleanBody = response.data.body
+            .replace(/<[^>]+>/g, '')  // HTMLタグ除去
+            .replace(/\n{3,}/g, '\n\n')  // 余分な改行を削除
+            .trim();
+            
+          displayContent += cleanBody;
+        }
+  
+        setRawContent(displayContent || '内容なし');
+      } else {
+        setRawContent('取得失敗、サーバーからsuccessが返されませんでした');
+      }
+  
+    } catch (error) {
+      const errorId = Math.random().toString(36).substring(2, 9);
+      console.error(`[${errorId}] 生メール取得失敗:`, error);
+  
+      setRawContent(`
+  メール内容を読み込めません (エラーID: ${errorId})
+  ${error instanceof Error ? error.message : '不明なエラー'}
+  
+  この情報をスクリーンショットしてサポートチームへ連絡してください
+      `);
+  
+      toast({
+        title: `取得失敗 (${errorId})`,
+        description: '詳細は詳細エリアをご確認ください',
+        status: 'error',
+        duration: 8000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoadingEmails(false);
+    }
   };
+  
 
-  // 初始化加载
+  // 初期読み込み
   useEffect(() => {
     const initLoad = async () => {
       await loadRecentEmails();
@@ -247,16 +316,16 @@ export default function CallbackPage() {
     initLoad();
   }, [accessToken]);
 
-  // 加载状态显示
+  // ローディング表示
   if (loading) return <p>ログイン中...</p>;
   if (error) return <p style={{ color: 'red' }}>{error}</p>;
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-100 text-gray-800 w-full">
-      {/* 欢迎标题 */}
+      {/* ウェルカムタイトル */}
       <p className="text-xl font-semibold">ようこそ、{userEmail}</p>
       
-      {/* 操作行 */}
+      {/* 操作バー */}
       <div className="flex items-center justify-between flex-wrap gap-4 bg-white p-4 rounded shadow-md">
         {/* 左：次回自動取得時間 + 今すぐ実行 */}
         <div className="flex items-center gap-3 pr-6 border-r border-gray-300">
@@ -271,7 +340,7 @@ export default function CallbackPage() {
           </button>
         </div>
   
-        {/* 右：其他操作按钮 */}
+        {/* 右：その他操作ボタン */}
         <div className="flex items-center flex-wrap gap-3">
           <button
             onClick={handleFetchEmails}
@@ -288,63 +357,63 @@ export default function CallbackPage() {
           <button
             onClick={handleParseAndSaveAllEmails}
             className="px-4 py-2 text-sm bg-green-600 hover:bg-green-700 text-white rounded shadow min-w-[160px]"
-            disabled={isProcessing || !fetchedEmailCount}
+            disabled={isProcessing || !status.fetched}
           >
             {isProcessing ? '処理中...' : 'すべてのメールを解析'}
           </button>
         </div>
       </div>
   
-      {/* 状态栏 */}
+      {/* ステータスバー */}
       <div className="text-sm text-gray-700 space-y-1 p-4">
-        {/* 获取进度条 */}
-        {fetchProgress > 0 && fetchProgress < 100 && (
+        {/* 取得プログレスバー */}
+        {status.fetchProgress > 0 && status.fetchProgress < 100 && (
           <Box>
-            <Text>メール取得進捗: {fetchProgress}%</Text>
-            <Progress.Root value={fetchProgress} size="sm" colorScheme="blue" />
+            <Text>メール取得進捗: {status.fetchProgress}%</Text>
+            <Progress.Root value={status.fetchProgress} size="sm" colorScheme="blue" />
           </Box>
         )}
         
-        {/* 解析进度条 */}
-        {parseProgress > 0 && (
+        {/* 解析プログレスバー */}
+        {status.parseProgress > 0 && (
           <Box>
-            <Text>解析進捗: {parseProgress}%</Text>
-            <Progress.Root value={parseProgress} size="sm" colorScheme="green" />
+            <Text>解析進捗: {status.parseProgress}%</Text>
+            <Progress.Root value={status.parseProgress} size="sm" colorScheme="green" />
           </Box>
         )}
         
-        {/* 邮件数量信息 */}
+        {/* メール数情報 */}
         <VStack align="start" >
-          {fetchedEmailCount !== null && (
+          {status.fetched > 0 && (
             <Text>
-              {fetchedEmailCount > 0 
-                ? `${fetchedEmailCount} 通の新しいメールが見つかりました`
+              {status.fetched > 0 
+                ? `${status.fetched} 通の新しいメールが見つかりました`
                 : '新しいメールはありません'}
             </Text>
           )}
           
-          {parsedEmailCount !== null && (
+          {status.parsed > 0 && (
             <Text color="green.600">
-              すでに存在したデータ以外{parsedEmailCount} 通のメールを正常に解析して保存しました
+              既存データを除き {status.parsed} 通のメールを正常に解析・保存しました
             </Text>
           )}
         </VStack>
         
-        {/* 日志显示 */}
-        {logs.length > 0 && (
+        {/* ログ表示 */}
+        {status.logs.length > 0 && (
           <Box mt={2} p={2} bg="gray.50" borderRadius="md" maxH="200px" overflowY="auto">
-            {logs.map((log, index) => (
+            {status.logs.map((log, index) => (
               <Text key={index} fontSize="sm">{log}</Text>
             ))}
           </Box>
         )}
       </div>
   
-      {/* 邮件列表区域 */}
+      {/* メールリストエリア */}
       <div className="w-full flex-1 px-4 overflow-auto">
         {isLoadingEmails ? (
           <Box textAlign="center" py={10}>
-            <Text>加载中...</Text>
+            <Text>読み込み中...</Text>
           </Box>
         ) : recentEmails.length > 0 ? (
           <EmailTable emails={recentEmails} onEmailClick={handleEmailClick} />
@@ -355,8 +424,8 @@ export default function CallbackPage() {
         )}
       </div>
   
-      {/* 邮件详情抽屉 */}
-      <Drawer.Root placement="end">
+      {/* メール詳細ドロワー */}
+      <Drawer.Root placement="end" size="lg">
         <Drawer.Trigger asChild>
           <button ref={drawerTriggerRef} className="hidden" />
         </Drawer.Trigger>
@@ -366,33 +435,56 @@ export default function CallbackPage() {
           <DrawerPositioner>
             <DrawerContent>
               <DrawerHeader>
-                <DrawerTitle>メールの詳細</DrawerTitle>
+                <DrawerTitle>メール詳細</DrawerTitle>
               </DrawerHeader>
               <DrawerBody>
                 {selectedEmail ? (
-                  <div className="space-y-2">
-                    <p><strong>送信者：</strong>{selectedEmail.sender_email}</p>  
-                    <p><strong>件名：</strong>{selectedEmail.subject}</p>
-                    <p><strong>日付：</strong>{selectedEmail.received_at}</p>
+                  <div className="space-y-4">
+                    <div>
+                      <strong>差出人：</strong>
+                      <p>{selectedEmail.sender_email}</p>
+                    </div>
+                    <div>
+                      <strong>件名：</strong>
+                      <p>{selectedEmail.subject}</p>
+                    </div>
+                    <div>
+                      <strong>受信日：</strong>
+                      <p>{selectedEmail.received_at}</p>
+                    </div>
                     <div>
                       <strong>案件内容：</strong>
                       <p>{selectedEmail.project_description}</p>
                     </div>
-                    <p><strong>必須スキル：</strong>{Array.isArray(selectedEmail.required_skills) ? selectedEmail.required_skills.join(', ') : '-'}</p>
-                    <p><strong>尚可スキル：</strong>{Array.isArray(selectedEmail.optional_skills) ? selectedEmail.optional_skills.join(', ') : '-'}</p>
-                    <p><strong>勤務地：</strong>{selectedEmail.location}</p>
-                    <p><strong>単価：</strong>{selectedEmail.unit_price}</p>
+                    <div>
+                      <strong>必須スキル：</strong>
+                      <p>{Array.isArray(selectedEmail.required_skills) ? selectedEmail.required_skills.join(', ') : '-'}</p>
+                    </div>
+                    <div>
+                      <strong>尚可スキル：</strong>
+                      <p>{Array.isArray(selectedEmail.optional_skills) ? selectedEmail.optional_skills.join(', ') : '-'}</p>
+                    </div>
+                    <div>
+                      <strong>勤務地：</strong>
+                      <p>{selectedEmail.location}</p>
+                    </div>
+                    <div>
+                      <strong>単価：</strong>
+                      <p>{selectedEmail.unit_price}</p>
+                    </div>
+                    {rawContent && (
+                      <div className="mt-4">
+                        <strong>生メール内容：</strong>
+                        <Code className="block mt-2 p-4 whitespace-pre-wrap font-mono text-sm bg-gray-100 rounded overflow-auto h-[80vh] border border-gray-300 shadow-inner">
+                          {rawContent}
+                        </Code>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p>読み込み中...</p>
                 )}
               </DrawerBody>
-              <DrawerFooter className="flex justify-end space-x-2">
-                <DrawerActionTrigger asChild>
-                  <Button variant="outline">閉じる</Button>
-                </DrawerActionTrigger>
-                <Button colorScheme="blue">保存</Button>
-              </DrawerFooter>
               <DrawerCloseTrigger asChild>
                 <CloseButton size="sm" className="absolute top-4 right-4" />
               </DrawerCloseTrigger>
@@ -401,16 +493,16 @@ export default function CallbackPage() {
         </Portal>
       </Drawer.Root>
       
-      {/* 全局加载指示器 */}
+      {/* グローバルローディングインジケーター */}
       {(isProcessing || isLoadingEmails) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg max-w-md w-full">
             <Text mb={4}>
-              {isProcessing ? '处理中...' : '加载邮件中...'} 
-              {parseProgress > 0 && ` (${parseProgress}%)`}
+              {isProcessing ? '処理中...' : 'メール読み込み中...'} 
+              {status.parseProgress > 0 && ` (${status.parseProgress}%)`}
             </Text>
-            {parseProgress > 0 && (
-              <Progress.Root value={parseProgress} size="sm" colorScheme="blue" />
+            {status.parseProgress > 0 && (
+              <Progress.Root value={status.parseProgress} size="sm" colorScheme="blue" />
             )}
           </div>
         </div>

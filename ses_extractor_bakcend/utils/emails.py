@@ -48,7 +48,7 @@ def get_today_date_query():
 
     return f'after:{after_str} before:{before_str}'    # 返回Gmail搜索语法
 
-def fetch_ses_emails(access_token: str, query="(案件 OR SE OR 求人) has:nouserlabels"):
+def fetch_ses_emails(access_token: str, query=" has:nouserlabels"):
 # def fetch_ses_emails(access_token: str, query=" has:nouserlabels"):
 
     # 获取上次时间

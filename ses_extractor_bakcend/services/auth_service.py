@@ -16,7 +16,7 @@ class AuthService:
         self.jwt_algorithm = "HS256"
 
     def create_jwt(self, user_email: str) -> str:
-        """生成JWT令牌"""
+        """JWTトークンを生成"""
         return jwt.encode(
             {
                 "sub": user_email,
@@ -27,10 +27,10 @@ class AuthService:
         )
     
     def get_valid_token(self, user_email: str) -> str:
-        """获取有效的 access token"""
+        """有効なアクセストークンを取得"""
         tokens = self.get_tokens(user_email)
         if not tokens:
-            raise HTTPException(status_code=401, detail="未登录")
+            raise HTTPException(status_code=401, detail="ログインしていません")
 
         # タイムゾーンを統一して比較
         expires_at = datetime.fromisoformat(tokens["expires_at"])
@@ -45,7 +45,7 @@ class AuthService:
         return tokens["access_token"]
     
     def get_tokens(self, user_email: str) -> dict:
-        """从数据库获取 tokens"""
+        """データベースからトークンを取得"""
         response = self.supabase.table("user_tokens")\
             .select("*")\
             .eq("user_email", user_email)\
@@ -54,23 +54,23 @@ class AuthService:
         return response.data if response.data else None
     
     def refresh_token(self, user_email: str, refresh_token: str) -> str:
-        """刷新 access token"""
+        """アクセストークンをリフレッシュ"""
         try:
             new_token = self._refresh_access_token(refresh_token)
             self._update_access_token(user_email, new_token, 3600)
             return new_token
         except Exception as e:
-            logger.error(f"Token刷新失败: {str(e)}")
-            raise HTTPException(status_code=401, detail="Token刷新失败，请重新登录。")
+            logger.error(f"トークンリフレッシュ失敗: {str(e)}")
+            raise HTTPException(status_code=401, detail="トークンリフレッシュに失敗しました。再度ログインしてください。")
     
     def _refresh_access_token(self, refresh_token: str) -> str:
-        """实际的token刷新逻辑"""
+        """実際のトークンリフレッシュ処理"""
         token_url = "https://oauth2.googleapis.com/token"
         client_id = os.getenv("GOOGLE_CLIENT_ID")
         client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
         
         if not client_id or not client_secret:
-            raise ValueError("缺少 GOOGLE_CLIENT_ID 或 GOOGLE_CLIENT_SECRET 环境变量")
+            raise ValueError("GOOGLE_CLIENT_ID または GOOGLE_CLIENT_SECRET 環境変数が設定されていません")
         
         payload = {
             "client_id": client_id,
@@ -82,10 +82,10 @@ class AuthService:
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             return response.json().get("access_token")
-        raise Exception(f"Token刷新失败: {response.text}")
+        raise Exception(f"トークンリフレッシュ失敗: {response.text}")
     
     def _update_access_token(self, user_email: str, token: str, expires_in: int):
-        """更新数据库中的token"""
+        """データベースのトークンを更新"""
         expires_at = datetime.now() + timedelta(seconds=expires_in)
         self.supabase.table("user_tokens")\
             .update({
@@ -96,7 +96,7 @@ class AuthService:
             .execute()
 
     def store_tokens(self, user_email: str, token_data: dict):
-        """将 tokens 存储到数据库"""
+        """トークンをデータベースに保存"""
         try:
             expires_at = token_data["expires_at"]
             if not isinstance(expires_at, str):
@@ -113,8 +113,8 @@ class AuthService:
                 .execute()
             
             if hasattr(response, 'error') and response.error:
-                raise Exception(f"Supabase error: {response.error.message}")
+                raise Exception(f"Supabaseエラー: {response.error.message}")
                 
         except Exception as e:
-            logger.error(f"存储token失败: {str(e)}")
+            logger.error(f"トークン保存失敗: {str(e)}")
             raise
