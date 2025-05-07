@@ -3,10 +3,10 @@
 import { useEmailAuth } from '@/hooks/useEmailAuth';
 import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails, getRawEmail } from '@/services/emailService';
 import { EmailTable } from '@/components/EmailTable';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import {
-  Button, CloseButton, Drawer, Portal, DrawerBody, DrawerHeader, DrawerFooter, DrawerContent, DrawerTitle,
-  DrawerBackdrop, DrawerPositioner, DrawerCloseTrigger, DrawerActionTrigger,
+   CloseButton, Drawer, Portal, DrawerBody, DrawerHeader,  DrawerContent, DrawerTitle,
+  DrawerBackdrop, DrawerPositioner, DrawerCloseTrigger, 
   Progress, Box, Text, VStack, Code
 } from "@chakra-ui/react";
 import { createStandaloneToast } from '@chakra-ui/toast';
@@ -48,7 +48,7 @@ export default function CallbackPage() {
   });
   const [nextFetchTime, setNextFetchTime] = useState<string>('');
   const { toast } = createStandaloneToast();
-  const retryTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
 
   // 次回取得時間を計算
@@ -211,7 +211,7 @@ export default function CallbackPage() {
   };
 
   // 最新メール読み込み
-  const loadRecentEmails = async () => {
+  const loadRecentEmails = useCallback(async () => {
     if (!accessToken) return;
     
     setIsLoadingEmails(true);
@@ -231,7 +231,7 @@ export default function CallbackPage() {
     } finally {
       setIsLoadingEmails(false);
     }
-  };
+  }, [accessToken]);
 
   // 手動トリガー
   const handleManualTrigger = async () => {
@@ -314,7 +314,7 @@ export default function CallbackPage() {
       setNextFetchTime(calculateNextFetchTime());
     };
     initLoad();
-  }, [accessToken]);
+  }, [accessToken, loadRecentEmails]);
 
   // ローディング表示
   if (loading) return <p>ログイン中...</p>;

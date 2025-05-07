@@ -3,6 +3,17 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   ? 'https://ses-extractor.onrender.com' 
   : 'http://localhost:8000';
 
+
+// any 型を具体的な型に置き換え
+interface RawEmailResponse {
+  success: boolean;
+  data: {
+    body: string;
+    headers: Record<string, string>;
+    raw_json?: any; // 必要に応じてさらに詳細な型を定義
+  };
+}
+  
 // OAuth2トークンとJWTを取得
 export const fetchTokenWithCode = async (code: string) => {
   const response = await fetch(`${API_BASE_URL}/auth/callback`, {
@@ -71,7 +82,7 @@ export const parseAndSaveAllEmails = async (jwtToken: string) => {
   return response.json();
 };
 
-export const getRawEmail = async (rawEmailId: number, jwtToken: string,): Promise<any> => {
+export const getRawEmail = async (rawEmailId: number, jwtToken: string,): Promise<RawEmailResponse> => {
   const url = `${API_BASE_URL}/emails/get_raw_email/${rawEmailId}`;
   
   try {

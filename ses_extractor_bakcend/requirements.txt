@@ -10,3 +10,4 @@ apscheduler
 supabase
 PyJWT
 schedule
+python-jose[cryptography]==3.3.0
