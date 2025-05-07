@@ -25,3 +25,4 @@ build/
 *.icns
 config/client_secrets.json
 .streamlit/secrets.toml
+node_modules
