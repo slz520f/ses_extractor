@@ -127,45 +127,42 @@ export default function CallbackPage() {
   // メール解析関数
   const handleParseAndSaveAllEmails = async () => {
     if (!accessToken || !status.fetched) return;
-
+  
     setIsProcessing(true);
-    setStatus(prev => ({
-      ...prev,
+    setStatus(current => ({
+      ...current,
       parseProgress: 0,
       parsed: 0,
       logs: []
     }));
-
+  
     try {
       let successCount = 0;
       let isCompleted = false;
-
-      // スムーズなプログレス更新
+  
       const updateProgress = async (target: number) => {
         while (status.parseProgress < target && !isCompleted) {
-          setStatus(prev => ({
-            ...prev,
-            parseProgress: Math.min(prev.parseProgress + 2, target)
+          setStatus(currentState => ({
+            ...currentState,
+            parseProgress: Math.min(currentState.parseProgress + 2, target)
           }));
           await new Promise(resolve => setTimeout(resolve, 50));
         }
       };
-
-      // 実際の解析タスク
+  
       const parseTask = async () => {
         try {
           const result = await parseAndSaveAllEmails(accessToken);
           const parsedCount = result.parsedCount || result.parsedEmails?.length || 0;
           successCount = parsedCount;
           
-          // ステータス更新
-          setStatus(prev => ({
-            ...prev,
+          setStatus(current => ({
+            ...current,
             parseProgress: 100,
             parsed: parsedCount,
             logs: Array.isArray(result.parsedEmails) 
-              ? [...prev.logs, ...result.parsedEmails.map((e:Email) => e.subject)]
-              : prev.logs
+              ? [...current.logs, ...result.parsedEmails.map((e:Email) => e.subject)]
+              : current.logs
           }));
           
           isCompleted = true;
@@ -174,16 +171,14 @@ export default function CallbackPage() {
           throw err;
         }
       };
-
-      // 並列実行（プログレス更新と解析タスク）
+  
       await Promise.all([
         updateProgress(95),
         parseTask()
       ]);
-
-      // 最終アニメーション
+  
       await updateProgress(100);
-
+  
       toast({
         title: '解析完了',
         description: `${successCount} 通のメールを正常に解析・保存しました`,
@@ -191,10 +186,9 @@ export default function CallbackPage() {
         duration: 3000,
         isClosable: true,
       });
-
-      // メールリスト再読み込み
+  
       await loadRecentEmails();
-
+  
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'メール解析に失敗しました';
       toast({
@@ -204,7 +198,7 @@ export default function CallbackPage() {
         duration: 3000,
         isClosable: true,
       });
-      setStatus(prev => ({...prev, parseProgress: 0}));
+      setStatus(current => ({...current, parseProgress: 0}));
     } finally {
       setIsProcessing(false);
     }

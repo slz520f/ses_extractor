@@ -10,7 +10,7 @@ interface RawEmailResponse {
   data: {
     body: string;
     headers: Record<string, string>;
-    raw_json?: any; // 必要に応じてさらに詳細な型を定義
+    raw_json?: unknown; // 必要に応じてさらに詳細な型を定義
   };
 }
   
