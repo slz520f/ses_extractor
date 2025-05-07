@@ -77,7 +77,7 @@ export default function CallbackPage() {
     setIsLoadingEmails(true);
     try {
       const result = await fetchRecentEmails(accessToken);
-      setRecentEmails(_prev => {
+      setRecentEmails(()=> {
         const newEmails = result.emails || [];
         // 重複排除
         const uniqueEmails = newEmails.filter(
@@ -208,7 +208,7 @@ export default function CallbackPage() {
     } finally {
       setIsProcessing(false);
     }
-  }, [accessToken, status.fetched, loadRecentEmails, toast]);
+  }, [accessToken, status.fetched, status.parseProgress, loadRecentEmails, toast]);
 
    
 
