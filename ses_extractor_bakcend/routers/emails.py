@@ -2,7 +2,6 @@
 from fastapi import APIRouter, HTTPException,Depends
 from fastapi.responses import JSONResponse
 from fastapi import Request
-import json
 import os
 import logging
 from datetime import datetime, timedelta, timezone
