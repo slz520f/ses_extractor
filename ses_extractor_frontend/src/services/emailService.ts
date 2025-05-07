@@ -5,14 +5,15 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
 
 
 // any 型を具体的な型に置き換え
-interface RawEmailResponse {
+export interface RawEmailResponse {
   success: boolean;
   data: {
     body: string;
     headers: Record<string, string>;
-    raw_json?: unknown; // 必要に応じてさらに詳細な型を定義
   };
 }
+
+
   
 // OAuth2トークンとJWTを取得
 export const fetchTokenWithCode = async (code: string) => {
@@ -107,6 +108,9 @@ export const getRawEmail = async (rawEmailId: number, jwtToken: string,): Promis
       }
       throw new Error(`サーバーエラー (${response.status}): ${errorDetails || '詳細なエラー情報なし'}`);
     }
+    const responseJson = await response.json();
+    console.log('API响应内容:', responseJson); // 打印整个响应数据
+    return responseJson;
 
     return await response.json();
   } catch (error) {

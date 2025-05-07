@@ -3,6 +3,28 @@ import base64
 import logging
 from datetime import datetime
 import re
+
+def decode_base64(data: str) -> str:
+    try:
+        return base64.urlsafe_b64decode(data).decode('utf-8', errors='ignore')
+    except Exception as e:
+        logging.error(f"Base64 decode failed: {e}")
+        return ''
+    
+def extract_plain_text_from_parts(parts):
+    """递归从 parts 中提取 text/plain"""
+    for part in parts:
+        mime_type = part.get('mimeType', '')
+        body = part.get('body', {})
+        if mime_type == 'text/plain' and 'data' in body:
+            return decode_base64(body['data'])
+        # 如果子部分中还有 parts，则递归
+        if 'parts' in part:
+            result = extract_plain_text_from_parts(part['parts'])
+            if result:
+                return result
+    return ''
+    
 def extract_headers(msg, name):
     """メールヘッダから特定のフィールドを抽出"""
     # 获取消息中的headers列表(默认为空列表)
@@ -28,7 +50,7 @@ def extract_body(msg) -> str:
     
     # フォールバック：直接body.dataをデコード
     if 'body' in payload and 'data' in payload['body']:
-        return base64.urlsafe_b64decode(payload['body']['data']).decode('utf-8')
+        return decode_base64(payload['body']['data'])
     
     return msg.get('snippet', '')
 
@@ -42,3 +64,20 @@ def format_datetime(gmail_date):
     except Exception as e:
         logging.error(f"日付のフォーマットに失敗しました: {str(e)}")
         return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+def simplify_gmail_message(msg: dict) -> dict:
+    """提取有用字段并构建简化结构，便于后续统一保存"""
+    simplified = {
+        "id": msg.get("id"),
+        "payload": {
+            "headers": [
+                {"name": "Subject", "value": extract_headers(msg, "Subject")},
+                {"name": "From", "value": extract_headers(msg, "From")},
+                {"name": "Date", "value": extract_headers(msg, "Date")}
+            ],
+            "body": {
+                "data": extract_body(msg)
+            }
+        }
+    }
+    return simplified

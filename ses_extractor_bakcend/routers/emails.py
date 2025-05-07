@@ -3,6 +3,9 @@ from fastapi import APIRouter, HTTPException,Depends
 from fastapi.responses import JSONResponse
 from fastapi import Request
 import os
+import re
+import json
+from pydantic import BaseModel
 import logging
 from datetime import datetime, timedelta, timezone
 from dotenv import load_dotenv
@@ -13,6 +16,8 @@ from utils.gemini_and_db import parse_emails_with_gemini, send_to_api
 from services.auth_service import AuthService
 from middleware.auth import get_current_user
 from typing import Union
+from typing import Optional
+from typing import Dict
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 # 初期化
@@ -35,6 +40,15 @@ supabase: Client = create_client(
 # ログ設定
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+class RawEmailData(BaseModel):
+    body: str
+    headers: Dict[str, str]
+
+class RawEmailResponse(BaseModel):
+    success: bool
+    data: RawEmailData
+
 
 
 def get_parsed_message_ids() -> Set[str]:
@@ -164,3 +178,74 @@ async def get_recent_emails():
 
 
 
+
+@router.get("/get_raw_email/{raw_email_id}", response_model=RawEmailResponse)
+async def get_raw_email(
+    raw_email_id: int,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    try:
+        jwt_token = credentials.credentials
+        # await verify_jwt(jwt_token)
+
+        # 查询数据库
+        logger.info(f"🔍 查询原始邮件 ID: {raw_email_id}")
+        result = supabase.table('raw_emails').select('*').eq('id', raw_email_id).maybe_single().execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="指定ID的原始邮件不存在")
+
+        raw_email = result.data
+        raw_data = raw_email.get("raw_data")
+        
+        # 记录完整原始数据（调试用）
+        logger.info(f"完整原始数据: {raw_data}")
+
+        try:
+            email_json = json.loads(raw_data)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=422, detail="原始邮件数据格式无效")
+
+        # 关键修正：从payload层级提取数据
+        payload = email_json.get("payload", {})
+        logger.info(f"Payload数据: {payload}")
+
+        # 处理headers
+        headers_list = payload.get("headers", [])
+        headers_dict = {h.get("name"): h.get("value") for h in headers_list 
+                       if isinstance(h, dict) and "name" in h and "value" in h}
+
+        # 处理body
+        body_data = payload.get("body", {}).get("data", "")
+        
+        # Base64解码处理
+        if isinstance(body_data, str) and body_data.startswith("base64:"):
+            import base64
+            try:
+                body_data = base64.b64decode(body_data[7:]).decode("utf-8")
+              
+            except Exception as e:
+                logger.warning(f"Base64解码失败: {str(e)}")
+                body_data = "（正文解码失败）"
+
+        # 构建响应
+        response_data = {
+            "success": True,
+            "data": {
+                "headers": headers_dict,
+                "body": body_data,
+                "metadata": {
+                    "message_id": raw_email.get("message_id"),
+                    "stored_at": raw_email.get("created_at")
+                }
+            }
+        }
+
+        logger.info(f"处理后的响应数据: {response_data}")
+        return response_data
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ 获取原始邮件失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"服务器错误: {str(e)}")

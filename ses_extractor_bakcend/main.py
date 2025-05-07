@@ -17,7 +17,7 @@ print(f"SUPABASE_KEY: {os.getenv('SUPABASE_KEY')}")
 # 允许前端访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ses-extractor-1.onrender.com"], 
+    allow_origins=["https://ses-extractor.onrender.com","https://ses-extractor-1.onrender.com"], 
     # allow_origins=["http://localhost:3000"] ,
     allow_credentials=True,
     allow_methods=["*"],

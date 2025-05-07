@@ -33,6 +33,8 @@ interface ProcessStatus {
   parseProgress: number;
 }
 
+
+
 export default function CallbackPage() {
   const { loading, error, userEmail, accessToken } = useEmailAuth();
   const [recentEmails, setRecentEmails] = useState<Email[]>([]);
@@ -255,58 +257,33 @@ useEffect(() => {
   
     try {
       setIsLoadingEmails(true);
-      console.log('生メール取得中、ID:', email.raw_email_id);
-      
       const response = await getRawEmail(Number(email.raw_email_id), accessToken || '');
-      console.log('生メールレスポンス:', response);
+      console.log('API响应:', response);
   
-      if (response.success) {
+      if (response.success && response.data) {
         let displayContent = '';
+        const headers = response.data.headers || {};
+        
   
-        // ヘッダー情報追加
-        if (response.data.headers) {
-          displayContent += `差出人: ${response.data.headers.From || '不明'}\n`;
-          displayContent += `件名: ${response.data.headers.Subject || '無題'}\n`;
-          displayContent += `日付: ${response.data.headers.Date || '不明'}\n\n`;
-        }
+        // 添加头部信息
+        displayContent += `差出人: ${headers['From'] || '不明'}\n`;
+        displayContent += `件名: ${headers['Subject'] || '無題'}\n`;
+        displayContent += `日付: ${headers['Date'] || '不明'}\n\n`;
   
-        // 本文追加
-        if (response.data.body) {
-          const cleanBody = response.data.body
-            .replace(/<[^>]+>/g, '')  // HTMLタグ除去
-            .replace(/\n{3,}/g, '\n\n')  // 余分な改行を削除
-            .trim();
-            
-          displayContent += cleanBody;
-        }
+        displayContent += response.data.body || '（无正文内容）';
+      
   
-        setRawContent(displayContent || '内容なし');
+        setRawContent(displayContent);
       } else {
-        setRawContent('取得失敗、サーバーからsuccessが返されませんでした');
+        setRawContent('取得失敗: データ形式が不正です');
       }
-  
     } catch (error) {
-      const errorId = Math.random().toString(36).substring(2, 9);
-      console.error(`[${errorId}] 生メール取得失敗:`, error);
-  
-      setRawContent(`
-  メール内容を読み込めません (エラーID: ${errorId})
-  ${error instanceof Error ? error.message : '不明なエラー'}
-  
-  この情報をスクリーンショットしてサポートチームへ連絡してください
-      `);
-  
-      toast({
-        title: `取得失敗 (${errorId})`,
-        description: '詳細は詳細エリアをご確認ください',
-        status: 'error',
-        duration: 8000,
-        isClosable: true,
-      });
+      setRawContent(`エラー: ${error instanceof Error ? error.message : '不明なエラー'}`);
     } finally {
       setIsLoadingEmails(false);
     }
   };
+  
   
 
   // 初期読み込み

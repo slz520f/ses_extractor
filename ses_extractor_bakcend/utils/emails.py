@@ -5,7 +5,8 @@ from supabase import create_client, Client
 import os
 from datetime import datetime, timedelta
 from fastapi import HTTPException
-
+from .emails_helper import simplify_gmail_message
+from .gemini_and_db import save_raw_email
 # 配置
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_API_KEY = os.getenv("SUPABASE_KEY")
@@ -86,11 +87,15 @@ def fetch_ses_emails(access_token: str, query=""):
             latest_message_id = msg.get('id')
         # 检查邮件是否包含附件
         parts = msg.get('payload', {}).get('parts', [])
-        has_attachment = any(
-            part.get('filename') and part['filename'] != '' for part in parts
-        )
+        # has_attachment = any(
+        #     part.get('filename') and part['filename'] != '' for part in parts
+        # )
+        has_attachment = any(part.get('filename') for part in parts if part.get('filename'))
         # 不含附件的邮件加入结果列表
         if not has_attachment:
+            simplified_msg = simplify_gmail_message(msg)  # 👈 进行格式转换
+            raw_email_id = save_raw_email(msg['id'], simplified_msg)  # 👈 正确结构保存
+            msg['raw_email_id'] = raw_email_id  # 可选：用于后续标记处理
             ses_emails.append(msg)
 
     # 如果有抓到邮件，更新状态

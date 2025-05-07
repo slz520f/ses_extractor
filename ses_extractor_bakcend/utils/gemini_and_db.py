@@ -158,9 +158,21 @@ def save_raw_email(message_id: str, email_data: dict) :
     """存储原始邮件到raw_emails表"""
     try:
         if not message_id or not email_data:
-            logger.warning(f"无效参数: message_id={message_id}, email_data={bool(email_data)}")
+            logger.warning(f"无效参数: message\_id={message_id}, email_data={bool(email_data)}")
             return None
-            
+        
+        # 插入前检查是否已存在
+        existing = supabase.table("raw_emails") \
+            .select("id") \
+            .eq("message_id", message_id) \
+            .limit(1) \
+            .execute()
+
+        if existing.data:
+            logger.info(f"原始邮件已存在: message_id={message_id}, ID={existing.data[0]['id']}")
+            return existing.data[0]["id"]
+
+    
         insert_data = {
             "message_id": str(message_id)[:100],  # 限制长度
             "raw_data": json.dumps(email_data, ensure_ascii=False),
@@ -177,10 +189,11 @@ def save_raw_email(message_id: str, email_data: dict) :
             
         logger.info(f"存储原始邮件成功: ID={response.data[0]['id']}")
         return response.data[0]['id']
-        
+            
     except Exception as e:
-        logger.error(f"存储原始邮件失败 - message_id={message_id}: {str(e)}", exc_info=True)
-        return None
+            logger.error(f"存储原始邮件失败 - message_id={message_id}: {str(e)}", exc_info=True)
+            return None
+      
 
 
 
