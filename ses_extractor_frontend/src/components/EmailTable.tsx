@@ -78,7 +78,7 @@ export function EmailTable({ emails, onEmailClick }: { emails: Email[], onEmailC
     })
 
     setFilteredEmails(result)
-  }, [ globalFilter, selectedLocation, unitPriceRange, selectedSkill])
+  }, [ emails,globalFilter, selectedLocation, unitPriceRange, selectedSkill])
 
 
   

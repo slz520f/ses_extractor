@@ -3,7 +3,7 @@
 import { useEmailAuth } from '@/hooks/useEmailAuth';
 import { fetchEmails, parseAndSaveAllEmails, fetchRecentEmails, getRawEmail } from '@/services/emailService';
 import { EmailTable } from '@/components/EmailTable';
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import {
    CloseButton, Drawer, Portal, DrawerBody, DrawerHeader,  DrawerContent, DrawerTitle,
   DrawerBackdrop, DrawerPositioner, DrawerCloseTrigger, 
@@ -51,69 +51,75 @@ export default function CallbackPage() {
 
   const [isLoadingEmails, setIsLoadingEmails] = useState(false);
 
-  // 次回取得時間を計算
-  const calculateNextFetchTime = () => {
-    const now = new Date();
-    const nextHour = new Date(now);
-    nextHour.setHours(nextHour.getHours() + 1);
-    nextHour.setMinutes(0);
-    nextHour.setSeconds(0);
-    return nextHour.toLocaleTimeString();
-  };
+  // 次回取得時間を計算 (useMemoでメモ化)
+  const calculateNextFetchTime = useMemo(() => {
+    return () => {
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(nextHour.getHours() + 1);
+      nextHour.setMinutes(0);
+      nextHour.setSeconds(0);
+      return nextHour.toLocaleTimeString();
+    };
+  }, []);
 
-  // 自動取得が必要かチェック
-  const checkAutoFetch = () => {
-    const now = new Date();
-    const nextFetch = new Date(now);
-    nextFetch.setHours(nextFetch.getHours() + 1);
-    nextFetch.setMinutes(0);
-    nextFetch.setSeconds(0);
-    if (now >= nextFetch) {
-      handleManualTrigger();
-    }
-  };
+  
 
-  // タイマー設定（1分ごとに時間チェック）
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setNextFetchTime(calculateNextFetchTime());
-      checkAutoFetch();
-    }, 60000);
+ 
+
+
+  
+
+  // 最新メール読み込み
+  const loadRecentEmails = useCallback(async () => {
+    if (!accessToken) return;
     
-    return () => clearInterval(timer);
-  }, [checkAutoFetch]);
+    setIsLoadingEmails(true);
+    try {
+      const result = await fetchRecentEmails(accessToken);
+      setRecentEmails(prev => {
+        const newEmails = result.emails || [];
+        // 重複排除
+        const uniqueEmails = newEmails.filter(
+          (email:Email, index:number, self:Email[]) =>
+            index === self.findIndex(e => e.subject === email.subject)
+        );
+        return [...uniqueEmails];
+      });
+    } catch (error) {
+      console.error("メール読み込み失敗:", error);
+    } finally {
+      setIsLoadingEmails(false);
+    }
+  }, [accessToken]);
 
-  // メール取得関数
-  const handleFetchEmails = async () => {
+  // メール取得関数 (useCallbackでメモ化)
+  const handleFetchEmails = useCallback(async () => {
     if (!accessToken) return;
     
     try {
-      setStatus(prev => ({...prev, fetchProgress: 0}));
+      setStatus(current => ({...current, fetchProgress: 0}));
       
-      // プログレスアニメーション
       for (let i = 0; i <= 90; i += 10) {
         await new Promise(resolve => setTimeout(resolve, 200));
-        setStatus(prev => ({...prev, fetchProgress: i}));
+        setStatus(current => ({...current, fetchProgress: i}));
       }
 
       const result = await fetchEmails(accessToken);
       const newFetchedCount = result.emails?.length || 0;
       
-      // プログレス完了
-      setStatus(prev => ({
-        ...prev,
+      setStatus(current => ({
+        ...current,
         fetchProgress: 100,
         fetched: newFetchedCount
       }));
       
       await new Promise(resolve => setTimeout(resolve, 200));
-
-      // 取得後自動で最新メールをロード
       await loadRecentEmails();
       
     } catch (error) {
       console.error("メール取得失敗:", error);
-      setStatus(prev => ({...prev, fetchProgress: 0}));
+      setStatus(current => ({...current, fetchProgress: 0}));
       toast({
         title: '取得失敗',
         description: 'メール取得中にエラーが発生しました',
@@ -122,7 +128,7 @@ export default function CallbackPage() {
         isClosable: true,
       });
     }
-  };
+  }, [accessToken, loadRecentEmails, toast]);
 
   // メール解析関数
   const handleParseAndSaveAllEmails = async () => {
@@ -204,35 +210,37 @@ export default function CallbackPage() {
     }
   };
 
-  // 最新メール読み込み
-  const loadRecentEmails = useCallback(async () => {
-    if (!accessToken) return;
-    
-    setIsLoadingEmails(true);
-    try {
-      const result = await fetchRecentEmails(accessToken);
-      setRecentEmails(prev => {
-        const newEmails = result.emails || [];
-        // 重複排除
-        const uniqueEmails = newEmails.filter(
-          (email:Email, index:number, self:Email[]) =>
-            index === self.findIndex(e => e.subject === email.subject)
-        );
-        return [...uniqueEmails];
-      });
-    } catch (error) {
-      console.error("メール読み込み失敗:", error);
-    } finally {
-      setIsLoadingEmails(false);
-    }
-  }, [accessToken]);
+   
 
-  // 手動トリガー
-  const handleManualTrigger = async () => {
-    await handleFetchEmails();
-    await handleParseAndSaveAllEmails();
+// 手動トリガー (useCallbackでメモ化)
+const handleManualTrigger = useCallback(async () => {
+  await handleFetchEmails();
+  await handleParseAndSaveAllEmails();
+  setNextFetchTime(calculateNextFetchTime());
+}, [handleFetchEmails, handleParseAndSaveAllEmails, calculateNextFetchTime]);
+
+// 自動取得が必要かチェック (useCallbackでメモ化)
+const checkAutoFetch = useCallback(() => {
+  const now = new Date();
+  const nextFetch = new Date(now);
+  nextFetch.setHours(nextFetch.getHours() + 1);
+  nextFetch.setMinutes(0);
+  nextFetch.setSeconds(0);
+  if (now >= nextFetch) {
+    handleManualTrigger();
+  }
+}, [handleManualTrigger]);
+
+// タイマー設定（1分ごとに時間チェック）
+useEffect(() => {
+  const timer = setInterval(() => {
     setNextFetchTime(calculateNextFetchTime());
-  };
+    checkAutoFetch();
+  }, 60000);
+  
+  return () => clearInterval(timer);
+}, [checkAutoFetch, calculateNextFetchTime]);
+  
 
   // メールクリック時の詳細表示
   const drawerTriggerRef = useRef<HTMLButtonElement>(null);
@@ -308,7 +316,7 @@ export default function CallbackPage() {
       setNextFetchTime(calculateNextFetchTime());
     };
     initLoad();
-  }, [accessToken, loadRecentEmails]);
+  }, [accessToken, loadRecentEmails, calculateNextFetchTime]);
 
   // ローディング表示
   if (loading) return <p>ログイン中...</p>;
