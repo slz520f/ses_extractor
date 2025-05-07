@@ -81,7 +81,7 @@ export default function CallbackPage() {
     }, 60000);
     
     return () => clearInterval(timer);
-  }, []);
+  }, [checkAutoFetch]);
 
   // メール取得関数
   const handleFetchEmails = async () => {
