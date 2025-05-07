@@ -77,7 +77,7 @@ export default function CallbackPage() {
     setIsLoadingEmails(true);
     try {
       const result = await fetchRecentEmails(accessToken);
-      setRecentEmails(prev => {
+      setRecentEmails(_prev => {
         const newEmails = result.emails || [];
         // 重複排除
         const uniqueEmails = newEmails.filter(
@@ -131,7 +131,7 @@ export default function CallbackPage() {
   }, [accessToken, loadRecentEmails, toast]);
 
   // メール解析関数
-  const handleParseAndSaveAllEmails = async () => {
+  const handleParseAndSaveAllEmails = useCallback(async () => {
     if (!accessToken || !status.fetched) return;
   
     setIsProcessing(true);
@@ -208,7 +208,7 @@ export default function CallbackPage() {
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [accessToken, status.fetched, loadRecentEmails, toast]);
 
    
 
