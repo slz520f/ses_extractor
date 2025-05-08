@@ -14,14 +14,21 @@ load_dotenv()  # 加载 .env 文件中的环境变量
 print(f"SUPABASE_URL: {os.getenv('SUPABASE_URL')}")
 print(f"SUPABASE_KEY: {os.getenv('SUPABASE_KEY')}")
 
+# 允许的来源列表（生产+开发）
+origins = [
+    "https://ses-extractor-1.onrender.com",  # 生产前端
+    "http://localhost:3000",                 # 本地开发
+]
 # 允许前端访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ses-extractor.onrender.com","https://ses-extractor-1.onrender.com"], 
+    # # allow_origins=["https://ses-extractor.onrender.com","https://ses-extractor-1.onrender.com"], 
     # allow_origins=["http://localhost:3000"] ,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"]  # 允许前端访问自定义头
 )
 
 # 注册路由

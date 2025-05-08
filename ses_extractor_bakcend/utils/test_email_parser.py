@@ -90,7 +90,7 @@ def test_hard_case():
                 'location': project.get("勤務地", ""),
                 'unit_price': project.get("単価", ""),
                 'raw_email_id': raw_email_id,
-                'original_message_id': email_data["id"]
+                
             })
         
         # 写入数据库

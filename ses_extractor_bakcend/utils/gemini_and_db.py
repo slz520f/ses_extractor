@@ -247,7 +247,7 @@ def parse_emails_with_gemini(emails: List[dict], progress_callback=None, api_key
                     'message_id': email.get('id', f"gen_{int(time.time())}_{i}_{idx}"),
                     'project_index': idx,
                     'raw_email_id': raw_email_id,  # 添加这1个新字段
-                    'original_message_id': email.get('id')  # 新增原始消息ID
+                    
                 }
                 logger.debug(f"项目{idx}数据: {json.dumps(project_data, ensure_ascii=False)}")
                 results.append(project_data)
@@ -281,7 +281,7 @@ def send_to_api(email_data_list):
                 "unit_price": str(data.get('unit_price', ''))[:100],
                 "project_index": int(data.get('project_index', 0)),
                 "raw_email_id": data.get('raw_email_id'),
-                "original_message_id": data.get('original_message_id')  # 新增字段
+               
             }
 
             logger.debug(f"准备插入数据: message_id={insert_data['message_id']}, project_index={insert_data['project_index']}")
