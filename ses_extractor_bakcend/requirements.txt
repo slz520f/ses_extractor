@@ -6,6 +6,7 @@ python-multipart
 email-validator
 google-auth-oauthlib
 google-generativeai
+google-ai-generativelanguage==0.6.15
 apscheduler
 supabase
 PyJWT

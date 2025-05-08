@@ -13,12 +13,17 @@ load_dotenv()  # 加载 .env 文件中的环境变量
 # 打印加载的环境变量
 print(f"SUPABASE_URL: {os.getenv('SUPABASE_URL')}")
 print(f"SUPABASE_KEY: {os.getenv('SUPABASE_KEY')}")
+# PostgreSQL接続設定
+print(f"POSTGRES_HOST: {os.getenv('POSTGRES_HOST')}")
+print(f"POSTGRES_DB: {os.getenv('POSTGRES_DB')}")
+print(f"POSTGRES_USER: {os.getenv('POSTGRES_USER')}")
 
 # 允许前端访问
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://ses-extractor.onrender.com","https://ses-extractor-1.onrender.com"], 
-    # allow_origins=["http://localhost:3000"] ,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://ses-extractor-1.onrender.com"], 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

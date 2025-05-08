@@ -115,8 +115,8 @@ async def auth_callback(request: Request):
         logger.info(f"用户 {user_email} 登录成功")
         
         # フロントエンドのURL設定
-        # frontend_home_url = "http://localhost:3000/auth/callback" 
-        frontend_home_url = "https://ses-extractor-1.onrender.com/auth/callback"
+        frontend_home_url = "http://localhost:3000/auth/callback" 
+        # frontend_home_url = "https://ses-extractor-1.onrender.com/auth/callback"
         return RedirectResponse(url=f"{frontend_home_url}/?email={user_email}&access_token={jwt_token}")
    
         
