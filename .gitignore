@@ -26,3 +26,7 @@ build/
 config/client_secrets.json
 .streamlit/secrets.toml
 node_modules
+.devcontainer
+.github
+.vscode
+build
